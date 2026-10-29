@@ -29,6 +29,7 @@ export type SnapshotMsg = {
     bullets: BulletState[];
     items: ItemState[];
     teams: TeamState[];
+    walls: WallState[];
 };
 export type EventMsg = {
     t: MsgType.EVENT;
@@ -42,6 +43,7 @@ export type PlayerState = {
     y: number;
     vx: number;
     vy: number;
+    angle: number;
     hp: number;
     maxHp: number;
     teamId: string | null;
@@ -50,6 +52,8 @@ export type PlayerState = {
     ammo: number;
     speedBoostLeft: number;
     shieldLeft: number;
+    color: string;
+    isSelf?: boolean;
 };
 export type BulletState = {
     id: string;
@@ -70,6 +74,13 @@ export type TeamState = {
     id: string;
     members: string[];
     connections: Array<[string, string]>;
+    color: string;
+};
+export type WallState = {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
 };
 export declare const TICK_RATE = 60;
 export declare const MAX_CONNECTIONS = 3;
@@ -83,7 +94,9 @@ export declare const SPEED_BOOST_REGEN_SEC = 30;
 export declare const SHIELD_SEC = 10;
 export declare const BOMB_DMG_ENEMY = 80;
 export declare const BOMB_DMG_LINKED = 40;
-export declare const BOMB_LINKED_NEAR = 5;
 export declare const HP_PLUS = 10;
 export declare const ROUNDS_COUNT = 3;
 export declare const ROUNDS_BULLETS = 10;
+export declare const TILE = 48;
+export declare const MAZE_W = 30;
+export declare const MAZE_H = 25;

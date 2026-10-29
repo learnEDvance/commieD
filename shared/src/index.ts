@@ -9,7 +9,7 @@ export enum MsgType {
 
 export type JoinMsg = { t: MsgType.JOIN; name: string };
 export type InputMsg = { t: MsgType.INPUT; seq: number; mx: number; my: number; shoot: boolean; dash: boolean; use: boolean };
-export type SnapshotMsg = { t: MsgType.SNAPSHOT; tick: number; time: number; players: PlayerState[]; bullets: BulletState[]; items: ItemState[]; teams: TeamState[] };
+export type SnapshotMsg = { t: MsgType.SNAPSHOT; tick: number; time: number; players: PlayerState[]; bullets: BulletState[]; items: ItemState[]; teams: TeamState[]; walls: WallState[] };
 export type EventMsg = { t: MsgType.EVENT; kind: string; data?: any };
 
 export type PlayerState = {
@@ -17,6 +17,7 @@ export type PlayerState = {
   name: string;
   x: number; y: number;
   vx: number; vy: number;
+  angle: number;
   hp: number;
   maxHp: number;
   teamId: string | null;
@@ -25,11 +26,14 @@ export type PlayerState = {
   ammo: number;
   speedBoostLeft: number;
   shieldLeft: number;
+  color: string;
+  isSelf?: boolean;
 };
 
 export type BulletState = { id: string; x: number; y: number; vx: number; vy: number; ownerId: string; life: number };
 export type ItemState = { id: string; x: number; y: number; kind: string };
-export type TeamState = { id: string; members: string[]; connections: Array<[string,string]> };
+export type TeamState = { id: string; members: string[]; connections: Array<[string,string]>; color: string };
+export type WallState = { x: number; y: number; w: number; h: number };
 
 export const TICK_RATE = 60;
 export const MAX_CONNECTIONS = 3;
@@ -43,7 +47,10 @@ export const SPEED_BOOST_REGEN_SEC = 30;
 export const SHIELD_SEC = 10;
 export const BOMB_DMG_ENEMY = 80;
 export const BOMB_DMG_LINKED = 40;
-export const BOMB_LINKED_NEAR = 5;
 export const HP_PLUS = 10;
 export const ROUNDS_COUNT = 3;
 export const ROUNDS_BULLETS = 10;
+
+export const TILE = 48;
+export const MAZE_W = 30;
+export const MAZE_H = 25;
