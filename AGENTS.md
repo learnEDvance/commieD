@@ -7,3 +7,4 @@
 - Follow plan/checklist strictly
 - Commit after each step
 - Test as we go
+- be conservativ with token usage(like a miser)
