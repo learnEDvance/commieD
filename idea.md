@@ -1,25 +1,14 @@
-# commieD - Plan
-
-## Core Idea
+# commieD-Idea
 
 - Multiplayer maze shooter (browser-based)
-
 - Large scale: 1000s of concurrent players across 200 cities globally
-
 - Goal: be the last team standing
-
 -the entire game is minimal in design and assets with the theme of communism(cause commieD=comm(unist)i(com)eD(y))
-
 - Teams are divided uniformly.
-
 - Teams share everything(from ammo, dashes, and even HP)
-
 - If the team HP goes to 0, the entire team dies.
-
 - on a team dying, only the n/2 best players will be revived with team hp also getting halved(number of plrs\*hp per players= team HP, simpool)
-
 - dead players(the n/2 not selected to play), act as ghosts, who search and collect resources for the team.
-
 - on the number of players in team reaching one, the team dies. and is eliminated.
 04 — ghost mode
 - the ghosts will play minigames to earn resources 
@@ -48,32 +37,14 @@ Health regeneration rules
 - Normal regeneration does not happen instantly.
 - Teams with ghosts cannot regenerate HP normally.
 - Teams with ghosts depend on ghost-generated HP instead.
-06 — Ghost Shooting
-- Ghosts can choose to participate directly in combat.
-- Ghosts can select any living teammate.
-- Ghosts attach themselves to the selected teammate.
-- Multiple ghosts can attach to the same teammate.
-- Each ghost operates a separate gun.
-- These guns function as additional weapons mounted on the player's body.
-- The resulting player behaves somewhat like a tank with multiple guns.
-Ghost gun properties
-- Ghost guns deal low damage.
-- Ghost guns use stun-based ammunition.
-- Bullets reduce the enemy's movement speed slightly.
-- The slow effect is additive with successive hits.
-Ghost distribution
-- Ghosts are distributed among living teammates.
-- A ghost can choose which teammate to support.
-- The maximum number of ghosts attached to one player is determined by:
-               Number of ghosts in team/number of living people in team
-07 — Bullet Press
+06 — Bullet Press
 - Bullet Press is a factory-themed minigame.
 - Ghosts work in a virtual bullet factory.
 - Ghosts print bullets.
 - Ghosts load printed bullets into magazines.
 - The produced ammunition is supplied to living teammates.
 - The objective is to maintain the team's ammunition supply.
-08 — Other Resource Minigames
+07 — Other Resource Minigames
 - Each resource type has its own minigame.
 - Ghosts play these minigames to generate resources.
 - Different minigames involve different activities.
