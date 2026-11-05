@@ -1,14 +1,14 @@
 # commieD — Implementation Checklist
 
 Work in phase order; keep one phase in progress. Tick only verified work.
-Current tree has no code — phase 1 starts from the prototype available at `a4c9ebb^`.
+Current tree has no code. Start fresh in phase 1 — do not restore the deleted prototype.
 
 ## 0. Naming & repo hygiene
-- [ ] Rename `co-up` / `netshoot` → `commieD` in docs, package names, and client title
-- [ ] Decide and record the package scope (e.g. `@commieD/*`)
-- [ ] Add root `.gitignore`: `node_modules`, `dist`, `.env*`, `coverage`, logs
-- [ ] Add a README quickstart + architecture overview
-- [ ] Resolve the stale "ghost shooting" line in `idea.md` with the owner (do not silently edit it)
+- [x] Rename `co-up` / `netshoot` → `commieD` in docs; use `commieD` for future package/client names
+- [x] Decide and record the package scope: `@commied/*` (lowercase npm scope)
+- [x] Add root `.gitignore`: `node_modules`, `dist`, `.env*`, `coverage`, logs
+- [x] Add a README quickstart + architecture overview
+- [x] Resolve the stale "ghost shooting" line in `idea.md` — owner removed it
 
 ## 1. Workspace foundation
 - [ ] Restore npm workspaces root `package.json` (`client`, `server`, `shared`) + lockfile
