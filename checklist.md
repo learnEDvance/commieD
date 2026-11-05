@@ -1,7 +1,7 @@
 # commieD — Implementation Checklist
 
 Work in phase order; keep one phase in progress. Tick only verified work.
-Current tree has no code. Start fresh in phase 1 — do not restore the deleted prototype.
+Phase 1 is complete: the workspace builds, typechecks, lints, and tests. Start gameplay in phase 2.
 
 ## 0. Naming & repo hygiene
 - [x] Rename `co-up` / `netshoot` → `commieD` in docs; use `commieD` for future package/client names
@@ -11,16 +11,16 @@ Current tree has no code. Start fresh in phase 1 — do not restore the deleted 
 - [x] Resolve the stale "ghost shooting" line in `idea.md` — owner removed it
 
 ## 1. Workspace foundation
-- [ ] Restore npm workspaces root `package.json` (`client`, `server`, `shared`) + lockfile
-- [ ] Add a shared strict TS config; keep ES2022 modules per package
-- [ ] Add lint + format tooling and scripts
-- [ ] Add a test runner (e.g. Vitest) with per-package scripts
-- [ ] Add `typecheck` (`tsc --noEmit`) scripts
-- [ ] Add CI: install → typecheck → lint → test → build
-- [ ] Fix build order: `shared` → `server` → `client`
-- [ ] Make `dev` watch all three packages (including `shared`)
-- [ ] Add `.env.example` for ports/URLs; keep secrets server-side
-- [ ] Verify from scratch: clean install, dev, build, test
+- [x] Create npm workspaces root `package.json` (`client`, `server`, `shared`) + lockfile
+- [x] Add a shared strict TS config; keep ES2022 modules per package
+- [x] Add lint + format tooling and scripts
+- [x] Add a test runner (Vitest) with per-package scripts
+- [x] Add `typecheck` (`tsc --noEmit`) scripts
+- [x] Add CI: install → typecheck → lint → test → build
+- [x] Fix build order: `shared` → `server` → `client`
+- [x] Make `dev` watch all three packages (including `shared`)
+- [x] Add `.env.example` for ports/URLs; keep secrets server-side
+- [x] Verify from scratch: clean install, dev, build, test
 
 ## 2. Shared protocol & simulation primitives
 - [ ] Define IDs, `Vec2`, player/team/bullet/resource/ghost state types

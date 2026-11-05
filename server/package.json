@@ -1,0 +1,26 @@
+{
+  "name": "@commied/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../.env src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node --env-file-if-exists=../.env dist/index.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@commied/shared": "*",
+    "@fastify/websocket": "^11.3.7",
+    "fastify": "^5.12.8",
+    "ws": "^8.22.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/ws": "^8.18.2",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3"
+  }
+}
