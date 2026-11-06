@@ -1,7 +1,8 @@
 # commieD — Implementation Checklist
 
 Work in phase order; keep one phase in progress. Tick only verified work.
-Phase 1 is complete: the workspace builds, typechecks, lints, and tests. Start gameplay in phase 2.
+
+Plan principle: **local-first**. Build a playable offline game, then add networking around the same deterministic simulation. Gameplay rules live in `shared`, never in client rendering or server request handlers.
 
 ## 0. Naming & repo hygiene
 - [x] Rename `co-up` / `netshoot` → `commieD` in docs; use `commieD` for future package/client names
@@ -22,64 +23,48 @@ Phase 1 is complete: the workspace builds, typechecks, lints, and tests. Start g
 - [x] Add `.env.example` for ports/URLs; keep secrets server-side
 - [x] Verify from scratch: clean install, dev, build, test
 
-## 2. Shared protocol & simulation primitives
-- [ ] Define IDs, `Vec2`, player/team/bullet/resource/ghost state types
-- [ ] Define message envelope + `MsgType` (`JOIN`, `INPUT`, `SNAPSHOT`, `EVENT`, …)
-- [ ] Add protocol versioning and runtime validation for all inbound messages
-- [ ] Centralize tunables in shared constants (tick rate, speeds, HP, damage, minigame rates)
-- [ ] Document time convention (`dt`, server tick) and units
-- [ ] Unit-test serialization/validation round trips
+## 2. Local simulation core
+Goal: one deterministic simulation both the offline client and future server can run.
+- [ ] Define environment-agnostic state types (`World`, `Player`, `Team`, `Bullet`, `Resource`, `Ghost`, `Input`)
+- [ ] Implement fixed-step `step(world, inputs, dt)` in `shared/src/sim`
+- [ ] Use a seeded RNG; never call `Math.random()` inside the simulation
+- [ ] Centralize tunables (speed, HP, damage, dash, regen, minigame rates)
+- [ ] Keep the simulation free of DOM, network, timers, and storage APIs
+- [ ] Add a local driver: fixed-step accumulator + interpolated rendering
+- [ ] Unit-test deterministic replay, no-op input, and dt stability
+- [ ] Document time/units and the client ↔ simulation boundary
 
-## 3. Authoritative server core
-- [ ] Fastify + WebSocket server exposing `/ws` and `/health`
-- [ ] Fixed-timestep simulation loop decoupled from snapshot send rate
-- [ ] Session lifecycle: join, reconnect grace, disconnect cleanup
-- [ ] Input queue with sequence numbers + last-processed acknowledgement
-- [ ] Delta/interest-managed snapshots instead of full-state broadcasts
-- [ ] Document lag-compensation approach (or explicitly accept client-side tradeoffs)
-- [ ] Basic metrics: tick time, players, rooms, message rates
-- [ ] Load-test harness with N simulated clients
-- [ ] Room/shard model for ~200 cities + city/region matchmaking
-- [ ] Graceful shutdown and restart
-
-## 4. Client foundation
-- [ ] Vite + TS client shell with resize/DPR-safe canvas renderer
-- [ ] Connect over same-origin `/ws` proxy; URL configurable per environment
-- [ ] Capture input and send sequenced inputs at a fixed rate
-- [ ] Snapshot interpolation + local prediction/reconciliation
-- [ ] Render maze, players, bullets, resources, teams, and HUD
-- [ ] Connection/reconnect UX (connecting, lost, reconnected)
-- [ ] Browser smoke test: no console errors, stable frame rate
-
-## 5. Maze & movement
+## 3. Maze & movement (local)
 - [ ] Deterministic seeded maze generation + wall extraction
-- [ ] Shared circle-vs-rect collision used by the server
-- [ ] Valid spawn points and team separation
-- [ ] Movement with wall sliding; shared speed/dash constants
-- [ ] Team-shared dash charges
+- [ ] Shared circle-vs-rect collision used by the simulation
+- [ ] Valid spawn points / path centers
+- [ ] Movement with wall sliding
+- [ ] Team-shared dash charges with cooldown
 - [ ] Unit tests: determinism, collision edges, spawn validity
+- [ ] Playable slice: move through the maze with a following camera
 
-## 6. Teams, shared resources, combat
-- [ ] Uniform team assignment at match start
-- [ ] Team state: members, shared HP pool, shared ammo, shared dashes
-- [ ] Implement/document team HP formula: live players × HP per player
-- [ ] Route all damage into the shared HP pool; handle simultaneous deaths
-- [ ] Ammo pool consumption/reload; remove personal ammo
+## 4. Local combat & teams
+- [ ] Team model: members, shared HP pool, shared ammo, shared dashes
+- [ ] Uniform team assignment (temporary local bots/dummies are fine)
+- [ ] Team HP formula: live players × HP per player
 - [ ] Bullet spawn, travel, hit detection, damage, cleanup
-- [ ] Win condition: last team standing
-- [ ] Kill credit / killmit accrual from live-player kills
-- [ ] Tests: shared-pool math, wipe detection, win condition
+- [ ] Route all damage into the shared HP pool; handle simultaneous deaths
+- [ ] Shared ammo consumption/reload; no personal ammo
+- [ ] Kill credit / killmit accrual
+- [ ] Last-team-standing win condition
+- [ ] Playable slice: shoot opponents and watch the team HP pool react
+- [ ] Unit tests: pool math, hit detection, wipe/win conditions
 
-## 7. Death, revival, elimination
-- [ ] On team HP reaching 0: mark team dead and halve team HP
+## 5. Death, revival, elimination (local)
+- [ ] On team HP reaching 0: mark the team dead and halve its HP
 - [ ] Select the best `n/2` players for revival (define the ranking metric)
 - [ ] Revive with correct HP/ammo/reset state
 - [ ] Non-revived players enter ghost mode
-- [ ] Eliminate a team when live members reach 1 (define interaction with revival)
+- [ ] Eliminate a team when live members reach 1 (define revival interaction)
 - [ ] HUD/event feed for death, revival, and elimination
-- [ ] Tests: odd `n`, `n = 1`, repeated wipes, deterministic selection
+- [ ] Unit tests: odd `n`, `n = 1`, repeated wipes, deterministic selection
 
-## 8. Ghost mode & soul economy
+## 6. Ghost mode & soul economy (local)
 - [ ] Ghost state, visibility, and spectator camera
 - [ ] Ghosts collect world resources
 - [ ] Ghost chooses which resource to contribute
@@ -89,9 +74,9 @@ Phase 1 is complete: the workspace builds, typechecks, lints, and tests. Start g
 - [ ] Define bank cap/decay to prevent infinite stockpiles
 - [ ] Regen gating: no ghosts → normal regen; ghosts → ghost HP only
 - [ ] Anti-autoclicker and fairness checks
-- [ ] Tests: CPS thresholds, regen gating, banked HP consumption
+- [ ] Unit tests: CPS thresholds, regen gating, banked HP consumption
 
-## 9. Minigames
+## 7. Minigames (local)
 ### Bullet Press
 - [ ] Furnace hold 5 s → stays heated 20 s
 - [ ] Press molten iron into sheets
@@ -113,7 +98,25 @@ Phase 1 is complete: the workspace builds, typechecks, lints, and tests. Start g
 - [ ] Rate-limit/anti-cheat the input
 - [ ] Tests: conversion + caps
 
-## 10. Scale, reliability, security
+### Playable slice
+- [ ] Complete offline match: live combat → wipe → revival/ghost → minigame → win
+- [ ] Verify with placeholder assets only
+
+## 8. Multiplayer foundation
+Only start after the offline match is playable.
+- [ ] Define message envelope + `MsgType` (`JOIN`, `INPUT`, `SNAPSHOT`, `EVENT`, …)
+- [ ] Add protocol versioning and runtime validation for all inbound messages
+- [ ] Run the same `shared` simulation on the server; no duplicate rules
+- [ ] Fastify WebSocket server exposing `/ws` and `/health`
+- [ ] Session lifecycle: join, reconnect grace, disconnect cleanup
+- [ ] Input queue with sequence numbers + last-processed acknowledgement
+- [ ] Snapshot serialization; start full-state, then delta/interest-managed
+- [ ] Client networking driver replaces the local driver; keep offline mode working
+- [ ] Snapshot interpolation + local prediction/reconciliation
+- [ ] Desync detection / simulation checksum in development
+- [ ] Tests: protocol validation round trips, reconnect, two-client smoke test
+
+## 9. Scale, reliability, security
 - [ ] Interest management: send only relevant entities
 - [ ] Compress/binarize snapshots; budget bytes per client
 - [ ] Backpressure and drop policy for slow clients
@@ -125,7 +128,7 @@ Phase 1 is complete: the workspace builds, typechecks, lints, and tests. Start g
 - [ ] Load test 1k and 10k simulated players; record tick/bandwidth budget
 - [ ] Chaos tests: disconnects, slow clients, worker restart
 
-## 11. Observability & operations
+## 10. Observability & operations
 - [ ] Structured logs with request/player/room IDs
 - [ ] Metrics: CCU, rooms, tick duration, messages/s, errors
 - [ ] Dashboards and alerts
@@ -133,11 +136,16 @@ Phase 1 is complete: the workspace builds, typechecks, lints, and tests. Start g
 - [ ] Deploy pipeline with rollback
 - [ ] Privacy/security review; no secrets in client bundles
 
-## 12. Verification gates
-- [ ] `npm run typecheck` clean
-- [ ] `npm run lint` clean
-- [ ] `npm test` green
-- [ ] `npm run build` succeeds in dependency order
-- [ ] Manual 2-client match: join → fight → wipe → revive/ghost → minigame → win
+## 11. Verification gates
+### Local game gate
+- [ ] Offline match completes end-to-end with placeholder assets
+- [ ] Deterministic simulation tests pass
+- [ ] `npm run verify` passes
+- [ ] Single-player performance is stable
+
+### Multiplayer gate
+- [ ] Two real clients complete a match through the server
+- [ ] Reconnect and disconnect paths verified
 - [ ] Load test meets tick/bandwidth budget
+- [ ] `npm run verify` passes
 - [ ] README + checklist updated, step committed

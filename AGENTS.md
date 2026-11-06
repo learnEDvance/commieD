@@ -2,7 +2,7 @@
 
 ## Current state
 - Phase 1 workspace is scaffolded: npm workspaces, strict TS, Vite client, Fastify server, shared package, tests, lint, and CI.
-- Gameplay is not implemented. The client is a placeholder and the server only exposes `/health`.
+- Development is local-first: finish a playable offline match before adding multiplayer. The client is still a placeholder and the server only exposes `/health`.
 - `idea.md` is the product source of truth. Never edit it.
 - `checklist.md` is the execution tracker. Tick boxes only for work actually completed in the current request, and update it at the end of every request.
 
@@ -20,6 +20,8 @@
 - Node >= 22 is required. This workspace was verified on Node 26 / npm 12.
 
 ## Architecture notes
+- Local-first: all gameplay rules belong in a deterministic, environment-agnostic simulation under `shared/src`. The client drives it locally now; the server will drive the same simulation later.
+- Keep the simulation free of DOM, network, timers, and storage APIs, and use seeded RNG instead of `Math.random()`.
 - `shared/src` owns types and constants; client/server import `@commied/shared`, never duplicate definitions.
 - `shared` is consumed from `dist`, so rebuild it (or keep `dev` running) after changing its source.
 - Client dev server is Vite on `:5173`; `/ws`, `/api`, and `/health` proxy to `SERVER_URL` (default `http://localhost:8080`).

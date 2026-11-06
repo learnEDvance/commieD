@@ -4,7 +4,9 @@ Browser-based multiplayer maze shooter where teams share HP, ammo, and dashes. T
 
 ## Status
 
-Foundation only. The workspace builds, typechecks, lints, and tests; the client renders a placeholder and the server exposes a health check. Gameplay starts in phase 2 of [`checklist.md`](checklist.md).
+Foundation only. The workspace builds, typechecks, lints, and tests; the client renders a placeholder and the server exposes a health check.
+
+Development is **local-first**: build and finish a playable offline match, then add networking around the same deterministic simulation. See [`checklist.md`](checklist.md).
 
 ## Stack
 
@@ -69,7 +71,7 @@ checklist.md  Phased implementation tracker
 
 ## Architecture
 
-The server is authoritative: clients send sequenced inputs, the server advances a fixed-timestep simulation, and clients render snapshots with interpolation and local prediction. The `shared` package owns the protocol and tunable constants so client and server cannot drift.
+Gameplay lives in a deterministic, environment-agnostic simulation in `shared`. During local development the client drives that simulation directly. When multiplayer lands, the server runs the same simulation authoritatively; clients send sequenced inputs and render snapshots with interpolation and local prediction. The `shared` package also owns the protocol and tunable constants so client and server cannot drift.
 
 For the target scale (thousands of concurrent players across many cities), the server must use rooms/shards and interest-managed snapshots rather than broadcasting full state to every player.
 
