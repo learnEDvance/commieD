@@ -4,7 +4,7 @@ Browser-based multiplayer maze shooter where teams share HP, ammo, and dashes. T
 
 ## Status
 
-Foundation only. The workspace builds, typechecks, lints, and tests; the client renders a placeholder and the server exposes a health check.
+Phase 2 prototype. The workspace builds, typechecks, lints, and tests. A deterministic local simulation runs in the browser with placeholder movement in an empty arena; the server still only exposes a health check.
 
 Development is **local-first**: build and finish a playable offline match, then add networking around the same deterministic simulation. See [`checklist.md`](checklist.md).
 
@@ -79,4 +79,5 @@ For the target scale (thousands of concurrent players across many cities), the s
 
 - [`idea.md`](idea.md) — game design source of truth
 - [`checklist.md`](checklist.md) — implementation phases and verification gates
+- [`shared/src/sim/README.md`](shared/src/sim/README.md) — simulation contract and units
 - [`AGENTS.md`](AGENTS.md) — instructions for coding agents

@@ -2,7 +2,8 @@
 
 ## Current state
 - Phase 1 workspace is scaffolded: npm workspaces, strict TS, Vite client, Fastify server, shared package, tests, lint, and CI.
-- Development is local-first: finish a playable offline match before adding multiplayer. The client is still a placeholder and the server only exposes `/health`.
+- Phase 2 local simulation is in place: deterministic fixed-step world under `shared/src/sim`, seeded RNG, and an offline client driver with interpolated rendering.
+- Development is local-first: finish a playable offline match before adding multiplayer. The current client is an empty arena with placeholder movement only.
 - `idea.md` is the product source of truth. Never edit it.
 - `checklist.md` is the execution tracker. Tick boxes only for work actually completed in the current request, and update it at the end of every request.
 
@@ -20,8 +21,8 @@
 - Node >= 22 is required. This workspace was verified on Node 26 / npm 12.
 
 ## Architecture notes
-- Local-first: all gameplay rules belong in a deterministic, environment-agnostic simulation under `shared/src`. The client drives it locally now; the server will drive the same simulation later.
-- Keep the simulation free of DOM, network, timers, and storage APIs, and use seeded RNG instead of `Math.random()`.
+- Local-first: all gameplay rules belong in a deterministic, environment-agnostic simulation under `shared/src/sim`. The client drives it locally now; the server will drive the same simulation later.
+- Read `shared/src/sim/README.md` before changing simulation code. Keep it free of DOM, network, timers, and storage APIs, and use seeded RNG instead of `Math.random()`.
 - `shared/src` owns types and constants; client/server import `@commied/shared`, never duplicate definitions.
 - `shared` is consumed from `dist`, so rebuild it (or keep `dev` running) after changing its source.
 - Client dev server is Vite on `:5173`; `/ws`, `/api`, and `/health` proxy to `SERVER_URL` (default `http://localhost:8080`).

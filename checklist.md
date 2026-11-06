@@ -24,15 +24,21 @@ Plan principle: **local-first**. Build a playable offline game, then add network
 - [x] Verify from scratch: clean install, dev, build, test
 
 ## 2. Local simulation core
+Goal: one deterministic offline game, before multiplayer integration:
+-create a background
+-make a movable player.
+-give player the ability to shoot
+-
+## 2. Local simulation core
 Goal: one deterministic simulation both the offline client and future server can run.
-- [ ] Define environment-agnostic state types (`World`, `Player`, `Team`, `Bullet`, `Resource`, `Ghost`, `Input`)
-- [ ] Implement fixed-step `step(world, inputs, dt)` in `shared/src/sim`
-- [ ] Use a seeded RNG; never call `Math.random()` inside the simulation
-- [ ] Centralize tunables (speed, HP, damage, dash, regen, minigame rates)
-- [ ] Keep the simulation free of DOM, network, timers, and storage APIs
-- [ ] Add a local driver: fixed-step accumulator + interpolated rendering
-- [ ] Unit-test deterministic replay, no-op input, and dt stability
-- [ ] Document time/units and the client ↔ simulation boundary
+- [x] Define environment-agnostic state types (`World`, `Player`, `Team`, `Bullet`, `Resource`, `Ghost`, `Input`)
+- [x] Implement fixed-step `step(world, inputs, dt)` in `shared/src/sim`
+- [x] Use a seeded RNG; never call `Math.random()` inside the simulation
+- [x] Centralize tunables (speed, HP, damage, dash, regen, minigame rates)
+- [x] Keep the simulation free of DOM, network, timers, and storage APIs
+- [x] Add a local driver: fixed-step accumulator + interpolated rendering
+- [x] Unit-test deterministic replay, no-op input, and dt stability
+- [x] Document time/units and the client ↔ simulation boundary
 
 ## 3. Maze & movement (local)
 - [ ] Deterministic seeded maze generation + wall extraction

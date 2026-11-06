@@ -21,6 +21,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "pretest": "npm run build -w @commied/shared",
     "test": "npm run test --workspaces --if-present",
     "verify": "npm run typecheck && npm run lint && npm test && npm run build"
   },
