@@ -59,35 +59,43 @@ Purpose: ghosts produce magazines that living teammates load into their guns.
 
 Implemented: `bullet-press/` (ES modules, no dependencies). Tests run with `node --test`.
 
+Layout (top to bottom): sequence presenter → magazine loading area → bullet feeds.
+
 Rules as implemented:
 
-- A run shows a 10-character sequence drawn from `A–Z` and `0–9`.
+- One sequence fills one magazine. The sequence is 5 characters drawn from `A–Z` and `0–9`.
 - The player types the sequence in order; lowercase input is accepted.
-- A correct key loads 1 bullet into the current magazine. The typed rectangle moves left into the magazine.
-- A wrong key drops its typed rectangle, marks the current magazine broken, advances to the next sequence character, and lowers the multiplier by `0.1` (floor `0.5x`).
-- A magazine holds 5 bullets:
-  - perfect magazine → adds `multiplier` magazines to production, raises the multiplier by `0.1` (cap `5x`), resets nothing else;
-  - broken magazine → produces nothing, increments the broken count.
-- A broken magazine **cannot be discarded immediately**. It stays until it fills 5 bullets or the run ends.
-- A clean partial magazine carries into the next run; a partial broken magazine is discarded when the run ends.
-- Production is accumulated as a float; `takeMagazines()` returns whole magazines to the host and keeps the remainder.
-- The next run starts automatically 700 ms after a run completes.
+- A correct key pulls that slot's bullet feed up into the magazine and fills the slot green.
+- A wrong key fills the slot red and marks the whole magazine broken.
+- A broken magazine **cannot be discarded immediately**. It stays until every slot is filled.
+- When all slots are filled, the magazine ejects to the right and the next one enters from the left.
+- A perfect magazine produces `multiplier` magazines.
+- A broken magazine produces nothing and increments the broken count.
+- The multiplier is a **whole number from 1 to 5**, based on average time per key across the completed magazine:
+  - `≤ 400 ms/key` → `x5`
+  - `≤ 600 ms/key` → `x4`
+  - `≤ 800 ms/key` → `x3`
+  - `≤ 1100 ms/key` → `x2`
+  - slower → `x1`
+- The timer starts when the magazine docks, not while it slides in.
+- Production is an integer; `takeMagazines()` returns whole magazines to the host.
 - Sequences come from a seeded RNG (or an injected RNG), never `Math.random()`.
 
 Assumed (change if wrong):
 
-- The sequence is 10 characters and a magazine holds 5 bullets, so one perfect run yields 2 magazines.
+- The sequence length and the number of magazine slots are the same value.
 - Letters and digits only, to avoid punctuation/layout issues from the draft pseudocode.
 - Input is keyboard-only; no on-screen keypad yet.
-- The multiplier scales magazines produced per perfect magazine (`production += multiplier`).
-- Broken magazines are counted per discarded magazine, not per mistake.
+- Speed is the only multiplier input; accuracy only decides perfect vs broken.
+- A broken magazine awards `x0` because it produces nothing.
+- The speed thresholds are placeholders for playtesting.
 - No Q pause; `Q` is a valid sequence character.
 
 Open questions:
 
-- Confirm that a broken magazine auto-discards at run end rather than blocking the next run.
-- Confirm a clean partial magazine should carry across runs.
-- Confirm whether production should be whole magazines only in the host economy.
+- Tune the speed thresholds to the real feel of the game.
+- Confirm that a broken magazine should award `x0` rather than a low whole multiplier.
+- Confirm whether production should stay whole magazines in the host economy.
 
 ## 3. Stewed Luck
 

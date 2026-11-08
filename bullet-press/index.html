@@ -7,30 +7,32 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="press">
+    <main class="factory">
       <header class="stats">
-        <span class="stat">MULTIPLIER <strong id="multiplier">1.0x</strong></span>
-        <span class="stat">MAGAZINES <strong id="magazines">0.0</strong></span>
+        <span class="stat">LAST <strong id="multiplier">—</strong></span>
+        <span class="stat">MAGAZINES <strong id="magazines">0</strong></span>
         <span class="stat">BROKEN <strong id="broken">0</strong></span>
+        <span class="stat">TIME <strong id="elapsed">—</strong></span>
       </header>
 
-      <section class="code" aria-label="Code to type">
+      <section class="presenter" aria-label="Sequence to type">
+        <p class="section-label">SEQUENCE</p>
         <div id="code-row" class="code-row"></div>
-        <p id="code-status" class="code-status">Type the highlighted character</p>
+        <p id="code-status" class="code-status">Get ready</p>
       </section>
 
-      <section class="workspace">
+      <section class="load-area" aria-label="Magazine loading area">
         <div id="magazine" class="magazine" aria-label="Current magazine">
           <div id="magazine-slots" class="magazine__slots"></div>
           <span id="magazine-label" class="magazine__label">MAGAZINE</span>
         </div>
-
-        <div id="input-row" class="input-row" aria-label="Typed sequence"></div>
       </section>
 
+      <section id="feeds" class="feeds" aria-label="Bullet feeds"></section>
+
       <p class="hint">
-        Correct keys load the magazine. A wrong key breaks it; the broken magazine stays until
-        it fills or the sequence ends.
+        Type the highlighted character. Correct keys pull a green bullet up into the magazine;
+        a wrong key fills the slot red. Fill every slot to send the magazine down the line.
       </p>
     </main>
 

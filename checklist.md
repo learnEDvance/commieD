@@ -23,13 +23,17 @@ Tick only verified work. One small step at a time.
 ## Bullet Press
 
 - [x] Resolve sequence/perfect-run rules in `minigames.md`
-- [x] Implement core sequence + magazine rules
-- [x] Implement production multiplier
-- [x] Broken magazines stay until they fill or the run ends
-- [x] Unit tests for sequences, magazines, broken magazines, multiplier, production
-- [x] Browser shell: central code, typed rectangles, left-sliding magazine load
+- [x] One sequence fills one magazine (5 slots)
+- [x] Vertical presenter → magazine → bullet-feed layout
+- [x] Correct keys pull green bullets up; wrong keys leave red slots
+- [x] Magazine ejects right and the next enters from the left
+- [x] Broken magazines stay until all slots fill
+- [x] Whole-number speed multipliers (`x1`–`x5`) from average time per key
+- [x] Unit tests for sequences, slots, broken magazines, speed multipliers, production
+- [x] Browser smoke test: perfect magazine, ejection, next magazine, broken magazine
 - [x] Run instructions and rules documented in `bullet-press/README.md`
-- [ ] Confirm auto-discard at run end and partial-magazine carry-over with the user
+- [ ] Tune the speed thresholds through playtesting
+- [ ] Confirm broken magazines should award `x0`
 - [ ] Integrate `takeMagazines()` with the host magazine/resource API (waiting on host game)
 - [ ] Replace placeholder rectangles with final art
 

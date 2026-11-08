@@ -1,31 +1,46 @@
 # Bullet Press
 
-A ghost minigame for **commieD**. Type the displayed sequence to press bullets into magazines. Wrong keys break the magazine, and a broken magazine cannot be discarded until it fills or the sequence ends.
+A ghost minigame for **commieD**. One sequence fills one magazine. Type the displayed characters to pull bullets up into the magazine; wrong keys leave red slots. When every slot is filled, the magazine rolls out to the right and the next one enters from the left.
 
 This module is self-contained:
 
-- `src/bulletPressCore.js` — pure rules: sequences, magazines, broken magazines, multiplier, production. No DOM or timers.
-- `src/main.js` — browser wiring: keyboard input, code display, magazine slots, flying typed rectangles.
-- `index.html` + `styles.css` — minimal placeholder UI using plain rectangles. No image assets yet.
+- `src/bulletPressCore.js` — pure rules: sequences, slots, speed multiplier, production. No DOM or timers.
+- `src/main.js` — browser wiring: keyboard input, assembly-line animation, bullet feeds, elapsed timer.
+- `index.html` + `styles.css` — minimal placeholder UI. No image assets yet.
+
+## Layout
+
+From top to bottom:
+
+1. **Sequence presenter** — the characters to type; the next one is highlighted.
+2. **Magazine loading area** — a horizontal magazine with one slot per sequence character.
+3. **Bullet feeds** — one vertical feed line per slot. A correct key pulls that feed’s bullet up into the magazine.
+4. The completed magazine slides right and the next magazine slides in from the left.
 
 ## Rules implemented
 
-- A run is a 10-character sequence drawn from `A–Z` and `0–9`.
-- The player types the sequence in order.
-- A correct key loads 1 bullet into the current magazine.
-- A magazine holds 5 bullets.
-  - A perfect magazine adds `multiplier` magazines to production.
-  - A broken magazine produces nothing and increments the broken count.
-- A wrong key:
-  - marks the current magazine broken,
-  - advances to the next sequence character,
-  - lowers the multiplier by `0.1`, down to `0.5x`.
-- A broken magazine **cannot be discarded immediately**. It stays until:
-  - it fills 5 bullets and is ejected as broken, or
-  - the run ends, at which point a partial broken magazine is discarded.
-- A clean partial magazine carries into the next run.
-- The multiplier starts at `1.0x`, rises by `0.1` per perfect magazine, and caps at `5.0x`.
-- Production is accumulated as a float; `takeMagazines()` returns whole magazines and leaves the remainder.
+- One sequence is 5 characters drawn from `A–Z` and `0–9`.
+- A correct key fills the next magazine slot green and consumes that feed’s bullet.
+- A wrong key fills the next slot red and marks the whole magazine broken.
+- A broken magazine **cannot be discarded immediately**. It stays until every slot is filled.
+- Once all slots are filled, the magazine is ejected to the right and a new one enters from the left.
+- A perfect magazine produces `multiplier` magazines.
+- A broken magazine produces nothing and increments the broken count.
+- The multiplier is a **whole number from 1 to 5**, based on typing speed across the completed magazine:
+
+| Average time per key | Multiplier |
+| -------------------- | ---------- |
+| ≤ 400 ms             | x5         |
+| ≤ 600 ms             | x4         |
+| ≤ 800 ms             | x3         |
+| ≤ 1100 ms            | x2         |
+| slower               | x1         |
+
+- A broken magazine awards `x0` because it produces nothing.
+- Production is an integer; `takeMagazines()` returns the whole magazines produced and resets the counter.
+- The timer starts when a magazine docks in the loading area (`start(nowMs)`), not while it is sliding in.
+- Sequences come from a seeded RNG (or an injected RNG), never `Math.random()`.
+- There is no Q pause; `Q` is a valid sequence character.
 
 ## Controls
 
@@ -60,15 +75,17 @@ node --test
 
 ## Integration notes
 
-- `BulletPress` exposes `sequence`, `typed`, `index`, `filled`, `magazineBroken`, `runComplete`, `multiplier`, `production`, `magazinesProduced`, and `brokenMagazines`.
-- `press(char)` returns an event with `type` (`correct` / `wrong` / `ignored`), `magazineCompleted` (`perfect` / `broken` / `null`), `runComplete`, `discardedBroken`, and the current stats.
-- `nextRun()` starts the next sequence only after the current run is complete.
+- `BulletPress` exposes `sequence`, `slots`, `index`, `filled`, `complete`, `brokenMagazine`, `multiplierForDuration(durationMs)`, `lastMultiplier`, `lastDurationMs`, `production`, `magazinesProduced`, and `brokenMagazines`.
+- `start(nowMs)` begins the current magazine’s timer once it is docked.
+- `press(char, nowMs)` returns an event with `type` (`correct` / `wrong` / `ignored` / `not-ready`), `slotIndex`, `complete`, `broken`, `multiplier`, `durationMs`, and the current production.
+- `nextMagazine(nowMs)` starts a fresh sequence only after the current magazine is complete. Omit `nowMs` and call `start(nowMs)` when the magazine docks.
 - `takeMagazines()` is the resource-out call for the host game.
 - Sequences are deterministic from a seed or an injected RNG.
 
 ## Assumptions
 
-- The sequence uses letters and digits only (no punctuation), to avoid layout/shift issues from the draft pseudocode.
-- A 10-character run yields up to 2 magazines at 5 bullets each.
-- The multiplier applies to magazines produced per perfect magazine.
-- Broken magazines are cleared automatically at the end of a run, never mid-run.
+- The sequence uses letters and digits only (no punctuation), to avoid layout and shift issues.
+- The sequence length and magazine slots are the same value (`sequenceLength`).
+- Speed is the only multiplier input; accuracy only decides whether the magazine is perfect or broken.
+- The speed thresholds are placeholders and should be tuned with playtesting.
+- A broken magazine is counted once, when it finishes and is ejected.

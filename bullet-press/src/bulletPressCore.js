@@ -1,12 +1,15 @@
 export const DEFAULT_CONFIG = Object.freeze({
-  sequenceLength: 10,
-  bulletsPerMagazine: 5,
+  sequenceLength: 5,
   charset: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
-  startingMultiplier: 1,
-  minMultiplier: 0.5,
   maxMultiplier: 5,
-  multiplierStepDown: 0.1,
-  multiplierStepUp: 0.1,
+  // Average time per key for each whole-number multiplier. Slower than the
+  // last entry earns the default 1x.
+  speedSteps: Object.freeze([
+    { maxAverageMs: 400, multiplier: 5 },
+    { maxAverageMs: 600, multiplier: 4 },
+    { maxAverageMs: 800, multiplier: 3 },
+    { maxAverageMs: 1100, multiplier: 2 },
+  ]),
 });
 
 /** Small deterministic RNG so a sequence can be replayed from a seed. */
@@ -25,10 +28,14 @@ export function createRng(seed) {
 /**
  * Pure Bullet Press rules. The browser owns rendering, key events, and animations.
  *
- * A run is a fixed-length sequence. Each correct key loads one bullet into the
- * current magazine. A wrong key marks the current magazine broken; it stays in
- * place and cannot be discarded until it fills or the run ends. Once a run is
- * complete, call `nextRun()` to generate the next sequence.
+ * One sequence fills one magazine. Correct keys load green bullets; a wrong key
+ * still fills a slot, but turns it red and breaks that magazine. Once every slot
+ * is filled, the completed magazine is ejected and `nextMagazine()` can start a
+ * fresh one.
+ *
+ * The production multiplier is a whole number based on how quickly the magazine
+ * was completed: faster typing earns 5x, slower typing earns less. A broken
+ * magazine produces nothing.
  */
 export class BulletPress {
   constructor({ seed = 1, config = {}, rng } = {}) {
@@ -37,104 +44,120 @@ export class BulletPress {
     if (this.config.sequenceLength < 1) {
       throw new RangeError('sequenceLength must be at least 1');
     }
-    if (this.config.bulletsPerMagazine < 1) {
-      throw new RangeError('bulletsPerMagazine must be at least 1');
-    }
     if (this.config.charset.length < 1) {
       throw new RangeError('charset must contain at least one character');
     }
+    if (this.config.maxMultiplier < 1) {
+      throw new RangeError('maxMultiplier must be at least 1');
+    }
+    if (!Array.isArray(this.config.speedSteps) || this.config.speedSteps.length < 1) {
+      throw new RangeError('speedSteps must contain at least one step');
+    }
 
     this.rng = rng ?? createRng(seed);
-    this.multiplier = this.config.startingMultiplier;
     this.production = 0;
     this.brokenMagazines = 0;
-    this.cleanStreak = 0;
+
     this.sequence = [];
-    this.typed = [];
+    this.slots = [];
     this.index = 0;
-    this.filled = 0;
-    this.magazineBroken = false;
-    this.runComplete = false;
+    this.complete = false;
+    this.brokenMagazine = false;
+
+    this.startedAtMs = null;
+    this.lastMultiplier = null;
+    this.lastDurationMs = null;
 
     this.#generateSequence();
   }
 
   get expectedChar() {
-    return this.runComplete ? null : this.sequence[this.index];
+    return this.complete ? null : this.sequence[this.index];
+  }
+
+  get filled() {
+    return this.slots.length;
   }
 
   get magazinesProduced() {
-    return Math.floor(this.production + 1e-9);
+    return this.production;
   }
 
   get magazine() {
-    return { filled: this.filled, broken: this.magazineBroken };
+    return {
+      slots: this.slots.map((slot) => ({ ...slot })),
+      filled: this.filled,
+      broken: this.brokenMagazine,
+      complete: this.complete,
+    };
   }
 
-  /** Consume and return whole magazines produced so far. */
-  takeMagazines() {
-    const count = this.magazinesProduced;
-    this.production -= count;
-    return count;
+  /** Start the timer for the magazine currently in the loading area. */
+  start(nowMs) {
+    if (this.startedAtMs !== null || !Number.isFinite(nowMs)) {
+      return false;
+    }
+
+    this.startedAtMs = nowMs;
+    return true;
   }
 
-  /** Type one character. Returns an event describing what happened. */
-  press(input) {
-    if (this.runComplete) {
-      return { type: 'ignored' };
+  multiplierForDuration(durationMs) {
+    if (!Number.isFinite(durationMs) || durationMs < 0) {
+      return 1;
+    }
+
+    const averageMs = durationMs / this.config.sequenceLength;
+
+    for (const step of this.config.speedSteps) {
+      if (averageMs <= step.maxAverageMs) {
+        return Math.max(1, Math.min(this.config.maxMultiplier, step.multiplier));
+      }
+    }
+
+    return 1;
+  }
+
+  /**
+   * Type one character. Returns an event describing the slot that was filled.
+   * `nowMs` must come from the host clock; rules never read the wall clock.
+   */
+  press(input, nowMs) {
+    if (this.complete) {
+      return { type: 'ignored', reason: 'complete' };
+    }
+
+    if (this.startedAtMs === null) {
+      return { type: 'not-ready', reason: 'not-started' };
     }
 
     const char = String(input).toUpperCase();
     const expected = this.expectedChar;
     const correct = char === expected;
+    const slotIndex = this.index;
 
-    this.typed.push(char);
+    this.slots.push({ char, expected, correct });
     this.index += 1;
 
-    let magazineCompleted = null;
-
-    if (correct) {
-      this.filled += 1;
-
-      if (this.filled >= this.config.bulletsPerMagazine) {
-        if (this.magazineBroken) {
-          this.brokenMagazines += 1;
-          this.cleanStreak = 0;
-          magazineCompleted = 'broken';
-        } else {
-          this.production += this.multiplier;
-          this.cleanStreak += 1;
-          this.multiplier = Math.min(
-            this.config.maxMultiplier,
-            this.multiplier + this.config.multiplierStepUp,
-          );
-          magazineCompleted = 'perfect';
-        }
-
-        this.filled = 0;
-        this.magazineBroken = false;
-      }
-    } else {
-      this.cleanStreak = 0;
-      this.multiplier = Math.max(
-        this.config.minMultiplier,
-        this.multiplier - this.config.multiplierStepDown,
-      );
-      this.magazineBroken = true;
+    if (!correct) {
+      this.brokenMagazine = true;
     }
 
-    let discardedBroken = 0;
+    let multiplier = null;
+    let durationMs = null;
 
-    if (this.index >= this.sequence.length) {
-      this.runComplete = true;
+    if (this.index >= this.config.sequenceLength) {
+      this.complete = true;
+      durationMs = Math.max(0, nowMs - this.startedAtMs);
+      multiplier = this.brokenMagazine ? 0 : this.multiplierForDuration(durationMs);
 
-      // A broken magazine cannot be discarded mid-run. It is cleared here,
-      // once the whole sequence has been typed.
-      if (this.magazineBroken) {
+      this.lastMultiplier = multiplier;
+      this.lastDurationMs = durationMs;
+
+      if (this.brokenMagazine) {
         this.brokenMagazines += 1;
-        discardedBroken = 1;
-        this.filled = 0;
-        this.magazineBroken = false;
+      } else {
+        this.production += multiplier;
       }
     }
 
@@ -142,23 +165,42 @@ export class BulletPress {
       type: correct ? 'correct' : 'wrong',
       char,
       expected,
-      magazineCompleted,
-      runComplete: this.runComplete,
-      discardedBroken,
-      multiplier: this.multiplier,
+      correct,
+      slotIndex,
+      complete: this.complete,
+      broken: this.brokenMagazine,
+      multiplier,
+      durationMs,
       production: this.production,
       magazinesProduced: this.magazinesProduced,
     };
   }
 
-  /** Start the next manufacturing run. Only valid once the current run is done. */
-  nextRun() {
-    if (!this.runComplete) {
+  /**
+   * Start a fresh magazine once the current one is complete. If `nowMs` is
+   * supplied the next magazine's timer starts immediately; otherwise the host
+   * calls `start(nowMs)` when the magazine docks.
+   */
+  nextMagazine(nowMs) {
+    if (!this.complete) {
       return null;
     }
 
     this.#generateSequence();
+    this.slots = [];
+    this.index = 0;
+    this.complete = false;
+    this.brokenMagazine = false;
+    this.startedAtMs = Number.isFinite(nowMs) ? nowMs : null;
+
     return [...this.sequence];
+  }
+
+  /** Consume and return the whole magazines produced so far. */
+  takeMagazines() {
+    const count = this.production;
+    this.production = 0;
+    return count;
   }
 
   #generateSequence() {
@@ -169,8 +211,5 @@ export class BulletPress {
     }
 
     this.sequence = chars;
-    this.typed = [];
-    this.index = 0;
-    this.runComplete = false;
   }
 }
