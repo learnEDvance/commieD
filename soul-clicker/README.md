@@ -6,10 +6,10 @@ This module is intentionally small and self-contained:
 
 - `src/soulClickerCore.js` — pure rules and state (CPS window, HP gain/loss, color bands). No DOM, no timers.
 - `src/shapes.js` — random shape plans (type, position, size, delay, lifetime).
-- `src/main.js` — browser wiring: HUD, soul clicks, shape spawning, floating text.
+- `src/main.js` — browser wiring: HUD, soul clicks, shape spawning.
 - `assets/soul-placeholder.svg` — dummy central soul sprite. Replace with real art later.
 
-All assets are placeholders and paths are kept in one place (`index.html` + `main.js`).
+All assets are placeholders and paths are kept in one place (`index.html` + `main.js`). Visual polish is intentionally deferred until real art arrives.
 
 ## Rules implemented
 
@@ -21,7 +21,7 @@ All assets are placeholders and paths are kept in one place (`index.html` + `mai
   - **red** below baseline,
   - **yellow** from baseline through `baseline + 90`,
   - **green** above `baseline + 90`.
-- Random shapes fade in every 10–30 seconds at random screen positions. Clicking one grants `+5 HP`. Missing it has no penalty.
+- Random shapes appear every 10–30 seconds at random screen positions. Clicking one grants `+5 HP`. Missing it has no penalty.
 - The HP bar fill is scaled to `baseline + 90` and clamps at 100%; the numeric HP keeps growing past that.
 
 ## Run

@@ -33,13 +33,10 @@ const hpValue = document.querySelector('#hp-value');
 const hpMeta = document.querySelector('#hp-meta');
 const soulButton = document.querySelector('#soul-button');
 const shapeLayer = document.querySelector('#shape-layer');
-const floatLayer = document.querySelector('#float-layer');
 
-if (!hpBar || !hpFill || !hpValue || !hpMeta || !soulButton || !shapeLayer || !floatLayer) {
+if (!hpBar || !hpFill || !hpValue || !hpMeta || !soulButton || !shapeLayer) {
   throw new Error('Soul Clicker UI is incomplete');
 }
-
-const SHAPE_COLORS = ['#f2c94c', '#56ccf2', '#eb5757', '#9b51e0', '#6fcf97'];
 
 function updateHud(nowMs, rate) {
   const cps = clicker.cpsAt(nowMs);
@@ -52,31 +49,13 @@ function updateHud(nowMs, rate) {
   hpMeta.textContent = `baseline ${clicker.baseline} · living ${clicker.livingTeammates} · CPS ${cps.toFixed(1)} · ${rateLabel} HP/s`;
 }
 
-function pulseSoul() {
-  soulButton.classList.remove('is-clicked');
-  void soulButton.offsetWidth;
-  soulButton.classList.add('is-clicked');
-}
-
 soulButton.addEventListener('click', () => {
   clicker.click(performance.now());
-  pulseSoul();
 });
-
-function floatText(text, leftPercent, topPercent) {
-  const label = document.createElement('span');
-  label.className = 'float-text';
-  label.textContent = text;
-  label.style.left = `${leftPercent}%`;
-  label.style.top = `${topPercent}%`;
-  floatLayer.append(label);
-  label.addEventListener('animationend', () => label.remove());
-}
 
 function spawnShape(plan) {
   const shape = document.createElement('button');
   const size = Math.round(plan.sizePx);
-  const color = SHAPE_COLORS[Math.floor(Math.random() * SHAPE_COLORS.length)];
 
   shape.type = 'button';
   shape.className = `shape shape--${plan.type}`;
@@ -84,16 +63,11 @@ function spawnShape(plan) {
   shape.style.top = `calc(${plan.topPercent}% - ${size / 2}px)`;
   shape.style.width = `${size}px`;
   shape.style.height = `${size}px`;
-  shape.style.setProperty('--shape-color', color);
-  shape.style.animationDuration = `${plan.lifetimeMs}ms`;
   shape.setAttribute('aria-label', 'Collect soul shard');
 
   shape.addEventListener('click', () => {
     clicker.addShapeBonus();
-    floatText(`+${clicker.config.shapeBonusHp} HP`, plan.leftPercent, plan.topPercent);
-    shape.classList.add('is-collected');
-    shape.disabled = true;
-    window.setTimeout(() => shape.remove(), 160);
+    shape.remove();
   });
 
   shapeLayer.append(shape);

@@ -28,8 +28,9 @@ Rules as implemented:
   - **yellow** when `baseline <= hp <= baseline + 90`,
   - **green** when `hp > baseline + 90`.
 - The bar fill is scaled to `baseline + 90`, clamped at 100%; the numeric HP keeps growing beyond it.
-- Random shapes fade in every 10–30 seconds at random screen positions. Clicking one grants `+5 HP`; missing it has no penalty.
+- Random shapes appear every 10–30 seconds at random screen positions. Clicking one grants `+5 HP`; missing it has no penalty.
 - Shape types: circle, square, triangle, diamond, star.
+- Visual effects and polish are deferred; the UI is intentionally minimal and uses placeholder assets (flat shapes, no fades, glows, or transitions).
 
 Confirmed by user:
 
