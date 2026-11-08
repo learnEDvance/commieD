@@ -63,7 +63,7 @@ Layout (top to bottom): sequence presenter → magazine loading area → bullet 
 
 Rules as implemented:
 
-- One sequence fills one magazine. The sequence is 5 characters drawn from `A–Z` and `0–9`.
+- One sequence fills one magazine. The sequence is 5 characters drawn from `A–Z`.
 - The player types the sequence in order; lowercase input is accepted.
 - A correct key pulls that slot's bullet feed up into the magazine and fills the slot green.
 - A wrong key fills the slot red and marks the whole magazine broken.
@@ -84,7 +84,7 @@ Rules as implemented:
 Assumed (change if wrong):
 
 - The sequence length and the number of magazine slots are the same value.
-- Letters and digits only, to avoid punctuation/layout issues from the draft pseudocode.
+- Letters only (no digits or punctuation), to avoid confusion such as `0` vs `O`.
 - Input is keyboard-only; no on-screen keypad yet.
 - Speed is the only multiplier input; accuracy only decides perfect vs broken.
 - A broken magazine awards `x0` because it produces nothing.

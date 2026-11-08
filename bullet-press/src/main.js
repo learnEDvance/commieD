@@ -275,7 +275,7 @@ window.addEventListener('keydown', (event) => {
 
   const char = event.key.toUpperCase();
 
-  if (!/^[A-Z0-9]$/.test(char)) {
+  if (!/^[A-Z]$/.test(char)) {
     return;
   }
 

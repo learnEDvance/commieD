@@ -30,6 +30,30 @@ test('generates the same sequence from the same seed', () => {
   }
 });
 
+test('uses letters only by default', () => {
+  assert.equal(DEFAULT_CONFIG.charset, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
+  assert.ok(!/[0-9]/.test(DEFAULT_CONFIG.charset));
+
+  const core = new BulletPress({ seed: 7 });
+  for (const char of core.sequence) {
+    assert.match(char, /^[A-Z]$/);
+  }
+});
+
+test('ignores digits and punctuation without breaking the magazine', () => {
+  const core = makeCore();
+  core.start(0);
+
+  for (const input of ['1', '0', '-', '!']) {
+    const event = core.press(input, 100);
+    assert.equal(event.type, 'ignored');
+    assert.equal(event.reason, 'invalid-character');
+  }
+
+  assert.equal(core.filled, 0);
+  assert.equal(core.brokenMagazine, false);
+});
+
 test('uses the injected rng for the sequence', () => {
   const values = [0, 0.99, 0];
   const core = new BulletPress({

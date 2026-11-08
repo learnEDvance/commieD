@@ -19,7 +19,7 @@ From top to bottom:
 
 ## Rules implemented
 
-- One sequence is 5 characters drawn from `A–Z` and `0–9`.
+- One sequence is 5 characters drawn from `A–Z`.
 - A correct key fills the next magazine slot green and consumes that feed’s bullet.
 - A wrong key fills the next slot red and marks the whole magazine broken.
 - A broken magazine **cannot be discarded immediately**. It stays until every slot is filled.
@@ -45,7 +45,7 @@ From top to bottom:
 ## Controls
 
 - Type the highlighted character with the keyboard.
-- Alphanumeric keys only; modifiers and other keys are ignored.
+- Letter keys only; digits, punctuation, and modifiers are ignored.
 
 ## Run
 
@@ -84,7 +84,7 @@ node --test
 
 ## Assumptions
 
-- The sequence uses letters and digits only (no punctuation), to avoid layout and shift issues.
+- Letters only (no digits or punctuation), to avoid confusion such as `0` vs `O`.
 - The sequence length and magazine slots are the same value (`sequenceLength`).
 - Speed is the only multiplier input; accuracy only decides whether the magazine is perfect or broken.
 - The speed thresholds are placeholders and should be tuned with playtesting.

@@ -24,6 +24,7 @@ Tick only verified work. One small step at a time.
 
 - [x] Resolve sequence/perfect-run rules in `minigames.md`
 - [x] One sequence fills one magazine (5 slots)
+- [x] Letters-only sequences and input (no digits or punctuation)
 - [x] Vertical presenter → magazine → bullet-feed layout
 - [x] Correct keys pull green bullets up; wrong keys leave red slots
 - [x] Magazine ejects right and the next enters from the left

@@ -1,6 +1,6 @@
 export const DEFAULT_CONFIG = Object.freeze({
   sequenceLength: 5,
-  charset: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+  charset: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
   maxMultiplier: 5,
   // Average time per key for each whole-number multiplier. Slower than the
   // last entry earns the default 1x.
@@ -132,6 +132,11 @@ export class BulletPress {
     }
 
     const char = String(input).toUpperCase();
+
+    if (!/^[A-Z]$/.test(char)) {
+      return { type: 'ignored', reason: 'invalid-character' };
+    }
+
     const expected = this.expectedChar;
     const correct = char === expected;
     const slotIndex = this.index;
