@@ -1,3 +1,4 @@
+import { GameClock } from './clock.js';
 import { DEFAULT_CONFIG, SoulClicker } from './soulClickerCore.js';
 import { randomShapePlan } from './shapes.js';
 
@@ -33,10 +34,15 @@ const hpValue = document.querySelector('#hp-value');
 const hpMeta = document.querySelector('#hp-meta');
 const soulButton = document.querySelector('#soul-button');
 const shapeLayer = document.querySelector('#shape-layer');
+const pauseOverlay = document.querySelector('#pause-overlay');
 
-if (!hpBar || !hpFill || !hpValue || !hpMeta || !soulButton || !shapeLayer) {
+if (!hpBar || !hpFill || !hpValue || !hpMeta || !soulButton || !shapeLayer || !pauseOverlay) {
   throw new Error('Soul Clicker UI is incomplete');
 }
+
+const clock = new GameClock();
+const activeShapes = [];
+let pendingShape = null;
 
 function updateHud(nowMs) {
   const cps = clicker.cpsAt(nowMs);
@@ -50,15 +56,68 @@ function updateHud(nowMs) {
   hpMeta.textContent = `baseline ${clicker.baseline} · living ${clicker.livingTeammates} · CPS ${cps.toFixed(1)} · ${rateLabel} HP/s`;
 }
 
+function setPaused(next) {
+  if (next === clock.paused) {
+    return;
+  }
+
+  if (next) {
+    clicker.advanceTo(clock.now());
+    clock.pause();
+  } else {
+    clock.resume();
+  }
+
+  pauseOverlay.hidden = !clock.paused;
+  updateHud(clock.now());
+}
+
 soulButton.addEventListener('click', () => {
-  const nowMs = performance.now();
+  if (clock.paused) {
+    return;
+  }
+
+  const nowMs = clock.now();
   clicker.click(nowMs);
   updateHud(nowMs);
 });
 
-function spawnShape(plan) {
+window.addEventListener('keydown', (event) => {
+  if (event.repeat) {
+    return;
+  }
+
+  if (event.code !== 'KeyQ' && event.key.toLowerCase() !== 'q') {
+    return;
+  }
+
+  event.preventDefault();
+  setPaused(!clock.paused);
+});
+
+function makePendingShape(nowMs) {
+  const plan = randomShapePlan(Math.random, {
+    minDelayMs: clicker.config.shapeSpawnMinMs,
+    maxDelayMs: clicker.config.shapeSpawnMaxMs,
+    minLifetimeMs: clicker.config.shapeLifetimeMs,
+    maxLifetimeMs: clicker.config.shapeLifetimeMs,
+  });
+
+  return { plan, dueAtMs: nowMs + plan.delayMs };
+}
+
+function removeShape(entry) {
+  entry.element.remove();
+  const index = activeShapes.indexOf(entry);
+  if (index >= 0) {
+    activeShapes.splice(index, 1);
+  }
+}
+
+function spawnShape(plan, nowMs) {
   const shape = document.createElement('button');
   const size = Math.round(plan.sizePx);
+  const entry = { element: shape, expiresAtMs: nowMs + plan.lifetimeMs };
 
   shape.type = 'button';
   shape.className = `shape shape--${plan.type}`;
@@ -69,34 +128,47 @@ function spawnShape(plan) {
   shape.setAttribute('aria-label', 'Collect soul shard');
 
   shape.addEventListener('click', () => {
+    if (clock.paused) {
+      return;
+    }
+
     clicker.addShapeBonus();
-    shape.remove();
+    removeShape(entry);
+    updateHud(clock.now());
   });
 
   shapeLayer.append(shape);
-  window.setTimeout(() => shape.remove(), plan.lifetimeMs);
+  activeShapes.push(entry);
 }
 
-function scheduleShape() {
-  const plan = randomShapePlan(Math.random, {
-    minDelayMs: clicker.config.shapeSpawnMinMs,
-    maxDelayMs: clicker.config.shapeSpawnMaxMs,
-    minLifetimeMs: clicker.config.shapeLifetimeMs,
-    maxLifetimeMs: clicker.config.shapeLifetimeMs,
-  });
+function updateShapes(nowMs) {
+  if (pendingShape === null) {
+    pendingShape = makePendingShape(nowMs);
+  }
 
-  window.setTimeout(() => {
-    spawnShape(plan);
-    scheduleShape();
-  }, plan.delayMs);
+  if (nowMs >= pendingShape.dueAtMs) {
+    spawnShape(pendingShape.plan, nowMs);
+    pendingShape = makePendingShape(nowMs);
+  }
+
+  for (let i = activeShapes.length - 1; i >= 0; i -= 1) {
+    const entry = activeShapes[i];
+    if (nowMs >= entry.expiresAtMs) {
+      removeShape(entry);
+    }
+  }
 }
 
-function frame(nowMs) {
-  clicker.advanceTo(nowMs);
+function frame() {
+  const nowMs = clock.now();
+
+  if (!clock.paused) {
+    clicker.advanceTo(nowMs);
+    updateShapes(nowMs);
+  }
+
   updateHud(nowMs);
-
   window.requestAnimationFrame(frame);
 }
 
-scheduleShape();
 window.requestAnimationFrame(frame);

@@ -23,10 +23,15 @@
           <img class="soul__image" src="./assets/soul-placeholder.svg" alt="" aria-hidden="true" />
           <span class="soul__label">CONTRIBUTE</span>
         </button>
-        <p class="hint">Click the soul to feed your comrades</p>
+        <p class="hint">Click the soul to feed your comrades · Q to pause</p>
       </section>
 
       <div id="shape-layer" class="shape-layer" aria-live="polite"></div>
+
+      <div id="pause-overlay" class="pause-overlay" hidden>
+        <p class="pause-overlay__title">PAUSED</p>
+        <p class="pause-overlay__hint">Press Q to resume</p>
+      </div>
     </main>
 
     <script type="module" src="./src/main.js"></script>

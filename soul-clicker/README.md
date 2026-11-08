@@ -5,6 +5,7 @@ A ghost minigame for **commieD**. Click your soul to contribute HP to the living
 This module is intentionally small and self-contained:
 
 - `src/soulClickerCore.js` — pure rules and state (CPS window, HP gain/loss, color bands). No DOM, no timers.
+- `src/clock.js` — pause-aware game clock; freezes time without shifting timestamps.
 - `src/shapes.js` — random shape plans (type, position, size, delay, lifetime).
 - `src/main.js` — browser wiring: HUD, soul clicks, shape spawning.
 - `assets/soul-placeholder.svg` — dummy central soul sprite. Replace with real art later.
@@ -34,6 +35,11 @@ python3 -m http.server 8000
 ```
 
 Then open <http://localhost:8000/>.
+
+## Controls
+
+- **Click the soul** to contribute.
+- **Q** toggles pause. Pausing freezes HP gain/loss, the CPS window, and shape timers; resuming continues from the same game time.
 
 ### URL parameters
 

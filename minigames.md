@@ -31,6 +31,7 @@ Rules as implemented:
 - The bar fill is scaled to `baseline + 90`, clamped at 100%; the numeric HP keeps growing beyond it.
 - Random shapes appear every 10–30 seconds at random screen positions. Clicking one grants `+5 HP`; missing it has no penalty.
 - Shape types: circle, square, triangle, diamond, star.
+- Press **Q** to pause/resume. Pausing freezes HP gain/loss, the CPS window, and shape timers; pause duration is removed from game time.
 - Visual effects and polish are deferred; the UI is intentionally minimal and uses placeholder assets (flat shapes, no fades, glows, or transitions).
 
 Confirmed by user:

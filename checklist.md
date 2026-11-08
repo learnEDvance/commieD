@@ -15,6 +15,7 @@ Tick only verified work. One small step at a time.
 - [x] Browser shell: half-screen HP bar with numeric HP, central soul sprite, shape layer
 - [x] Dummy soul asset at `soul-clicker/assets/soul-placeholder.svg`
 - [x] Shape spawn loop every 10–30 seconds; click grants `+5 HP`
+- [x] Q pauses/resumes; HP, CPS window, and shape timers freeze
 - [x] Run instructions and URL parameters documented in `soul-clicker/README.md`
 - [ ] Integrate with the host team HP/resource API (waiting on host game)
 - [ ] Replace dummy assets with final art

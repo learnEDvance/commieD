@@ -131,6 +131,38 @@ body {
   color: #9aa39a;
 }
 
+/* ---------- Pause ---------- */
+
+.pause-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  background: rgb(0 0 0 / 60%);
+  text-align: center;
+}
+
+.pause-overlay[hidden] {
+  display: none;
+}
+
+.pause-overlay p {
+  margin: 0;
+}
+
+.pause-overlay__title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+}
+
+.pause-overlay__hint {
+  font-size: 13px;
+  color: #9aa39a;
+}
+
 /* ---------- Random shapes ---------- */
 
 .shape-layer {
