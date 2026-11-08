@@ -25,6 +25,11 @@ Tick only verified work. One small step at a time.
 - [x] Resolve sequence/perfect-run rules in `minigames.md`
 - [x] One sequence fills one magazine (10 slots)
 - [x] Full-width magazine line with feed lines running from below the screen up to it
+- [x] Magazine line centered horizontally and vertically
+- [x] Magazine, slots, and sequence objects scaled up 5%
+- [x] Upward arrowheads on every feed line
+- [x] Two empty magazines queued left of current; previous magazine kept on the right
+- [x] Feed lines fill upward when a slot is loaded (green correct, red wrong)
 - [x] Sequence presenter sits above the magazine line
 - [x] Instruction hint removed from the playfield
 - [x] Letters-only sequences and input (no digits or punctuation)
@@ -34,7 +39,7 @@ Tick only verified work. One small step at a time.
 - [x] Broken magazines stay until all slots fill
 - [x] Whole-number speed multipliers (`x1`–`x5`) from average time per key
 - [x] Unit tests for sequences, slots, broken magazines, speed multipliers, production
-- [x] Browser smoke test: perfect magazine, ejection, next magazine, broken magazine
+- [x] Browser smoke test: centered rail, queue positions, arrows, feed fills, perfect magazine, ejection, next magazine, broken magazine
 - [x] Run instructions and rules documented in `bullet-press/README.md`
 - [ ] Tune the speed thresholds through playtesting
 - [ ] Confirm broken magazines should award `x0`

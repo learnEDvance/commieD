@@ -59,7 +59,7 @@ Purpose: ghosts produce magazines that living teammates load into their guns.
 
 Implemented: `bullet-press/` (ES modules, no dependencies). Tests run with `node --test`.
 
-Layout (top to bottom): sequence presenter → full-width magazine line → bullet feeds. Each feed line runs from below the bottom of the screen up to the magazine line.
+Layout (top to bottom): sequence presenter → centered full-width magazine line → bullet feeds. The current magazine sits at the center of the screen, with two empty magazines queued to its left and the previous magazine to its right. Each feed line runs from below the bottom of the screen up to the magazine line, has an upward arrowhead, and fills upward as its slot is loaded. Magazine and sequence objects use a 5% larger scale.
 
 Rules as implemented:
 
@@ -68,7 +68,7 @@ Rules as implemented:
 - A correct key pulls that slot's bullet feed up into the magazine and fills the slot green.
 - A wrong key fills the slot red and marks the whole magazine broken.
 - A broken magazine **cannot be discarded immediately**. It stays until every slot is filled.
-- When all slots are filled, the magazine ejects to the right and the next one enters from the left.
+- When all slots are filled, the line shifts right: the current magazine becomes the previous one, a waiting magazine moves to the center, and a new empty magazine enters from the left. Older previous magazines slide farther right and fade out.
 - A perfect magazine produces `multiplier` magazines.
 - A broken magazine produces nothing and increments the broken count.
 - The multiplier is a **whole number from 1 to 5**, based on average time per key across the completed magazine:

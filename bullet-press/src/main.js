@@ -8,9 +8,7 @@ const brokenEl = document.querySelector('#broken');
 const elapsedEl = document.querySelector('#elapsed');
 const codeRow = document.querySelector('#code-row');
 const codeStatus = document.querySelector('#code-status');
-const magazine = document.querySelector('#magazine');
-const magazineSlots = document.querySelector('#magazine-slots');
-const magazineLabel = document.querySelector('#magazine-label');
+const magazineTrack = document.querySelector('#magazine-track');
 const feedsEl = document.querySelector('#feeds');
 const fxLayer = document.querySelector('#fx-layer');
 
@@ -21,9 +19,7 @@ if (
   !elapsedEl ||
   !codeRow ||
   !codeStatus ||
-  !magazine ||
-  !magazineSlots ||
-  !magazineLabel ||
+  !magazineTrack ||
   !feedsEl ||
   !fxLayer
 ) {
@@ -31,15 +27,18 @@ if (
 }
 
 const EJECT_DELAY_MS = 420;
-const ENTER_DURATION_MS = 340;
+const SHIFT_MS = 500;
+const MAGAZINE_GAP_PX = 48;
 const FLY_DURATION_MS = 220;
 const reduceMotion = window.matchMedia
   ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
   : false;
 
 const feedEls = [];
+const lineEntries = [];
+let currentEntry = null;
 let docked = false;
-let ejectTimer = null;
+let shiftTimer = null;
 
 document.documentElement.style.setProperty('--slots', String(core.config.sequenceLength));
 
@@ -55,10 +54,16 @@ function buildFeeds() {
     const line = document.createElement('span');
     line.className = 'feed__line';
 
+    const fill = document.createElement('span');
+    fill.className = 'feed__fill';
+
+    const arrow = document.createElement('span');
+    arrow.className = 'feed__arrow';
+
     const bullet = document.createElement('span');
     bullet.className = 'feed__bullet';
 
-    feed.append(line, bullet);
+    feed.append(line, fill, arrow, bullet);
     feedsEl.append(feed);
     feedEls.push(feed);
   }
@@ -66,8 +71,59 @@ function buildFeeds() {
 
 function resetFeeds() {
   for (const feed of feedEls) {
-    feed.classList.remove('is-used');
+    feed.classList.remove('is-used', 'is-wrong');
   }
+}
+
+function createMagazineEntry({ waiting = false } = {}) {
+  const el = document.createElement('div');
+  el.className = 'magazine';
+  if (waiting) {
+    el.classList.add('is-waiting');
+  }
+
+  const slotsEl = document.createElement('div');
+  slotsEl.className = 'magazine__slots';
+
+  const labelEl = document.createElement('span');
+  labelEl.className = 'magazine__label';
+
+  el.append(slotsEl, labelEl);
+  magazineTrack.append(el);
+
+  return { el, slotsEl, labelEl };
+}
+
+function renderEmptyShell(entry) {
+  entry.slotsEl.replaceChildren();
+
+  for (let i = 0; i < core.config.sequenceLength; i += 1) {
+    const slot = document.createElement('span');
+    slot.className = 'magazine__slot';
+    entry.slotsEl.append(slot);
+  }
+
+  entry.labelEl.textContent = 'EMPTY';
+  entry.el.classList.add('is-waiting');
+  entry.el.classList.remove('is-broken', 'is-current', 'is-previous', 'is-leaving');
+}
+
+function getStep() {
+  const sample = lineEntries[0]?.el;
+  if (!sample) {
+    return 0;
+  }
+
+  return sample.offsetWidth + MAGAZINE_GAP_PX;
+}
+
+function positionMagazines() {
+  const step = getStep();
+
+  lineEntries.forEach((entry, index) => {
+    const offset = (index - 2) * step;
+    entry.el.style.transform = `translate(calc(-50% + ${offset}px), -50%)`;
+  });
 }
 
 function renderStats() {
@@ -107,8 +163,17 @@ function renderCode() {
   }
 }
 
-function renderMagazine() {
-  magazineSlots.replaceChildren();
+function renderCurrentMagazine() {
+  const entry = currentEntry;
+  if (!entry) {
+    return;
+  }
+
+  entry.el.classList.remove('is-waiting', 'is-previous', 'is-leaving');
+  entry.el.classList.add('is-current');
+  entry.el.classList.toggle('is-broken', core.brokenMagazine);
+
+  entry.slotsEl.replaceChildren();
 
   for (let i = 0; i < core.config.sequenceLength; i += 1) {
     const slot = document.createElement('span');
@@ -122,11 +187,10 @@ function renderMagazine() {
       slot.classList.add('is-current');
     }
 
-    magazineSlots.append(slot);
+    entry.slotsEl.append(slot);
   }
 
-  magazine.classList.toggle('is-broken', core.brokenMagazine);
-  magazineLabel.textContent = core.complete
+  entry.labelEl.textContent = core.complete
     ? core.brokenMagazine
       ? 'BROKEN'
       : 'PERFECT'
@@ -138,7 +202,7 @@ function renderMagazine() {
 function render() {
   renderStats();
   renderCode();
-  renderMagazine();
+  renderCurrentMagazine();
 }
 
 function flyBullet(correct, startRect, endRect) {
@@ -167,58 +231,50 @@ function flyBullet(correct, startRect, endRect) {
   animation.finished.then(() => rect.remove()).catch(() => rect.remove());
 }
 
-function animateMagazineIn() {
-  docked = false;
-  render();
+function shiftLine() {
+  shiftTimer = null;
 
-  if (reduceMotion) {
+  if (!currentEntry) {
+    return;
+  }
+
+  const step = getStep();
+  const completed = currentEntry;
+
+  if (lineEntries.length > 3) {
+    const oldPrevious = lineEntries[3];
+    lineEntries.splice(3, 1);
+    oldPrevious.el.classList.remove('is-current', 'is-previous');
+    oldPrevious.el.classList.add('is-leaving');
+    oldPrevious.el.style.transform = `translate(calc(-50% + ${2 * step}px), -50%)`;
+    window.setTimeout(() => oldPrevious.el.remove(), SHIFT_MS + 100);
+  }
+
+  completed.el.classList.remove('is-current');
+  completed.el.classList.add('is-previous');
+
+  const newFar = createMagazineEntry({ waiting: true });
+  renderEmptyShell(newFar);
+  newFar.el.style.transform = `translate(calc(-50% + ${-3 * step}px), -50%)`;
+  void newFar.el.offsetWidth;
+
+  const newCurrent = lineEntries[1];
+  lineEntries.unshift(newFar);
+  currentEntry = newCurrent;
+
+  newCurrent.el.classList.remove('is-waiting');
+  newCurrent.el.classList.add('is-current');
+
+  positionMagazines();
+
+  window.clearTimeout(shiftTimer);
+  shiftTimer = window.setTimeout(() => {
+    core.nextMagazine();
+    resetFeeds();
     docked = true;
     core.start(performance.now());
     render();
-    return;
-  }
-
-  const animation = magazine.animate(
-    [
-      { transform: 'translate(-50%, -50%) translateX(-360px)', opacity: 0.35 },
-      { transform: 'translate(-50%, -50%) translateX(0)', opacity: 1 },
-    ],
-    { duration: ENTER_DURATION_MS, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
-  );
-
-  animation.finished
-    .then(() => {
-      docked = true;
-      core.start(performance.now());
-      render();
-    })
-    .catch(() => {});
-}
-
-function ejectMagazine() {
-  ejectTimer = null;
-
-  const prepareNext = () => {
-    core.nextMagazine();
-    resetFeeds();
-    render();
-    animateMagazineIn();
-  };
-
-  if (reduceMotion) {
-    prepareNext();
-    return;
-  }
-
-  const animation = magazine.animate(
-    [
-      { transform: 'translate(-50%, -50%) translateX(0)', opacity: 1 },
-      { transform: 'translate(-50%, -50%) translateX(360px)', opacity: 0.35 },
-    ],
-    { duration: 300, easing: 'ease-in' },
-  );
-
-  animation.finished.then(prepareNext).catch(prepareNext);
+  }, SHIFT_MS);
 }
 
 function handleInput(char) {
@@ -227,8 +283,8 @@ function handleInput(char) {
   }
 
   const slotIndex = core.index;
-  const feedBullet = feedEls[slotIndex]?.querySelector('.feed__bullet');
-  const startRect = feedBullet?.getBoundingClientRect();
+  const feed = feedEls[slotIndex];
+  const startRect = feed?.querySelector('.feed__bullet')?.getBoundingClientRect();
 
   const event = core.press(char, performance.now());
 
@@ -236,7 +292,10 @@ function handleInput(char) {
     return;
   }
 
-  feedEls[slotIndex]?.classList.add('is-used');
+  feed?.classList.add('is-used');
+  if (event.type === 'wrong') {
+    feed?.classList.add('is-wrong');
+  }
 
   if (core.complete) {
     docked = false;
@@ -244,15 +303,15 @@ function handleInput(char) {
 
   render();
 
-  const targetRect = magazineSlots.children[slotIndex]?.getBoundingClientRect();
+  const targetRect = currentEntry?.slotsEl.children[slotIndex]?.getBoundingClientRect();
 
   if (!reduceMotion && startRect && targetRect) {
     flyBullet(event.correct, startRect, targetRect);
   }
 
   if (core.complete) {
-    window.clearTimeout(ejectTimer);
-    ejectTimer = window.setTimeout(ejectMagazine, EJECT_DELAY_MS);
+    window.clearTimeout(shiftTimer);
+    shiftTimer = window.setTimeout(shiftLine, EJECT_DELAY_MS);
   }
 }
 
@@ -266,6 +325,23 @@ function tickElapsed() {
   }
 
   window.requestAnimationFrame(tickElapsed);
+}
+
+function setupLine() {
+  const far = createMagazineEntry({ waiting: true });
+  const near = createMagazineEntry({ waiting: true });
+  const current = createMagazineEntry();
+
+  lineEntries.push(far, near, current);
+  currentEntry = current;
+
+  renderEmptyShell(far);
+  renderEmptyShell(near);
+  renderCurrentMagazine();
+
+  magazineTrack.classList.add('no-transition');
+  positionMagazines();
+  window.requestAnimationFrame(() => magazineTrack.classList.remove('no-transition'));
 }
 
 window.addEventListener('keydown', (event) => {
@@ -283,8 +359,10 @@ window.addEventListener('keydown', (event) => {
   handleInput(char);
 });
 
+window.addEventListener('resize', positionMagazines);
+
 buildFeeds();
-render();
+setupLine();
 docked = true;
 core.start(performance.now());
 render();

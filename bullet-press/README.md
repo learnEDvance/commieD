@@ -12,18 +12,19 @@ This module is self-contained:
 
 From top to bottom:
 
-1. **Sequence presenter** — the characters to type; the next one is highlighted.
-2. **Magazine loading area** — a full-width assembly line with a 10-slot magazine.
-3. **Bullet feeds** — one vertical feed line per slot. Each line runs from below the bottom of the screen up to the magazine line. A correct key pulls that feed’s bullet up into the magazine.
-4. The completed magazine slides right and the next magazine slides in from the left.
+1. **Sequence presenter** — the characters to type; the next one is highlighted. It sits above the magazine line.
+2. **Magazine line** — a full-width conveyor centered in the middle of the screen. The current 10-slot magazine sits on the line, with two empty magazines queued to its left and the previous magazine (if any) to its right.
+3. **Bullet feeds** — one vertical feed line per slot. Each line runs from below the bottom of the screen up to the magazine line and has an upward arrowhead. A correct key fills that feed upward in green and pulls its bullet up into the magazine; a wrong key fills it red.
+4. When all slots are filled, the line shifts right: the current magazine becomes the previous one, a waiting magazine slides into the center, and a fresh empty magazine enters from the left. Older previous magazines slide farther right and fade out.
+5. Magazine and sequence objects use a 5% larger scale than the base layout.
 
 ## Rules implemented
 
 - One sequence is 10 characters drawn from `A–Z`.
-- A correct key fills the next magazine slot green and consumes that feed’s bullet.
-- A wrong key fills the next slot red and marks the whole magazine broken.
+- A correct key fills the next magazine slot green, consumes that feed’s bullet, and fills the feed line upward.
+- A wrong key fills the next slot red, fills that feed line red, and marks the whole magazine broken.
 - A broken magazine **cannot be discarded immediately**. It stays until every slot is filled.
-- Once all slots are filled, the magazine is ejected to the right and a new one enters from the left.
+- Once all slots are filled, the magazine shifts right, becomes the previous magazine, and a waiting magazine moves into the center.
 - A perfect magazine produces `multiplier` magazines.
 - A broken magazine produces nothing and increments the broken count.
 - The multiplier is a **whole number from 1 to 5**, based on typing speed across the completed magazine:
@@ -38,7 +39,7 @@ From top to bottom:
 
 - A broken magazine awards `x0` because it produces nothing.
 - Production is an integer; `takeMagazines()` returns the whole magazines produced and resets the counter.
-- The timer starts when a magazine docks in the loading area (`start(nowMs)`), not while it is sliding in.
+- The timer starts when a magazine reaches the center (`start(nowMs)`), not while it is sliding in.
 - Sequences come from a seeded RNG (or an injected RNG), never `Math.random()`.
 - There is no Q pause; `Q` is a valid sequence character.
 
