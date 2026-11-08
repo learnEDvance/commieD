@@ -13,10 +13,10 @@
 - `checklist.md` is intentionally empty. Add only minigame tasks and tick items only after verification.
 
 ## Current state
-- The workspace was intentionally cleared: no `package.json`, source, tests, or tooling. Do not assume npm commands exist.
-- Previous code was deleted on purpose. Do not recover it from git history.
-- The `.py` files are user-written draft pseudocode, not production implementations.
-- No minigame implementation has started yet; wait for the user to choose the next step.
+- The workspace was intentionally cleared and is now minigame-only. There is no root `package.json` or shared tooling; each minigame is self-contained.
+- Previous main-game code was deleted on purpose. Do not recover it from git history.
+- The `.py` files and `dash supplement factory` notes are user-written draft pseudocode, not production implementations.
+- Soul Clicker is implemented in `soul-clicker/` (vanilla ES modules + `node --test`). Other minigames are not started.
 
 ## Integration contract
 - Build each minigame as a self-contained module with a narrow interface: explicit inputs/state in, resources/events out.
@@ -25,7 +25,7 @@
 - Use placeholder assets until real assets arrive, and keep asset paths centralized.
 
 ## Minigame rules to follow
-- **Soul Clicker:** at 5 CPS generate +1 HP/s, banked until needed; below 5 CPS lose 0.2 HP/s. Normal team regen is disabled while ghosts exist.
+- **Soul Clicker:** at 5 CPS generate +1 HP/s, banked until needed; below 5 CPS lose 0.2 HP/s. No HP cap for teams with ghosts. Normal team regen is disabled while ghosts exist. HP bar is red below `100 × living teammates`, yellow through `+90`, green above. Random shapes spawn every 10–30 s for a small HP bonus.
 - **Bullet Press:** players follow keyboard sequences to make magazines. Imperfect magazines are rejected and the sequence restarts. Mistakes drop the production multiplier toward 0.5x; a long clean streak raises it slowly to 5x.
 - **Stewed Luck:** live-player kills earn killmit; spend it to spin the pot for a special power-up.
 - **Dash Supplement Factory:** follow the pot-preparation order exactly; any mistake destroys the whole batch. 1 pot = 20 seconds of speed, 1 bottle = 1 second.

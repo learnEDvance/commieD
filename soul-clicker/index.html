@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Soul Clicker — commieD</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="stage">
+      <section id="hp-bar" class="hp-bar" data-band="yellow" role="progressbar" aria-label="Team HP" aria-valuemin="0" aria-valuenow="100">
+        <div class="hp-bar__track">
+          <div id="hp-fill" class="hp-bar__fill"></div>
+        </div>
+        <div class="hp-bar__labels">
+          <strong id="hp-value" class="hp-bar__value">TEAM HP 100.0</strong>
+          <span id="hp-meta" class="hp-bar__meta">baseline 100 · living 1 · CPS 0.0 · -0.2 HP/s</span>
+        </div>
+      </section>
+
+      <section class="altar" aria-label="Contribute your soul">
+        <button id="soul-button" class="soul" type="button">
+          <img class="soul__image" src="./assets/soul-placeholder.svg" alt="" aria-hidden="true" />
+          <span class="soul__label">CONTRIBUTE</span>
+        </button>
+        <p class="hint">Click the soul to feed your comrades</p>
+      </section>
+
+      <div id="shape-layer" class="shape-layer" aria-live="polite"></div>
+      <div id="float-layer" class="float-layer" aria-hidden="true"></div>
+    </main>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

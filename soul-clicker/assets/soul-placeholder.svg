@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Placeholder soul">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="46%" r="52%">
+      <stop offset="0%" stop-color="#ffe8a3" stop-opacity="0.95" />
+      <stop offset="45%" stop-color="#f2c94c" stop-opacity="0.35" />
+      <stop offset="100%" stop-color="#eb5757" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="core" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff6d5" />
+      <stop offset="55%" stop-color="#f2c94c" />
+      <stop offset="100%" stop-color="#eb5757" />
+    </linearGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3" />
+    </filter>
+  </defs>
+
+  <circle cx="100" cy="100" r="96" fill="url(#glow)" />
+
+  <g filter="url(#soft)" opacity="0.85">
+    <path d="M100 24 L111 66 L156 66 L120 92 L133 136 L100 110 L67 136 L80 92 L44 66 L89 66 Z" fill="url(#core)" />
+  </g>
+
+  <path d="M100 30 L110 68 L150 68 L117 92 L129 132 L100 108 L71 132 L83 92 L50 68 L90 68 Z" fill="url(#core)" stroke="#fff6d5" stroke-width="2" stroke-linejoin="round" opacity="0.96" />
+
+  <circle cx="100" cy="100" r="6" fill="#0b0d0b" opacity="0.25" />
+</svg>

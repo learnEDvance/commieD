@@ -1,6 +1,6 @@
 # commieD — Minigame Specs
 
-Status: specs captured, implementation **not started**. `idea.md` is still the product source of truth; this file records the working details and open questions for the ghost minigames.
+Status: Soul Clicker implemented under `soul-clicker/`; Bullet Press, Stewed Luck, and Dash Supplement Factory not started. `idea.md` is still the product source of truth; this file records the working details and open questions for the ghost minigames.
 
 ## Shared contract
 
@@ -13,21 +13,42 @@ Status: specs captured, implementation **not started**. `idea.md` is still the p
 
 Purpose: a ghost contributes their soul to increase the team's HP.
 
-Rules:
+Implemented: `soul-clicker/` (ES modules, no dependencies). Tests run with `node --test`.
 
-- Click / press Space to contribute.
-- CPS is measured over a 10-second window.
+Rules as implemented:
+
+- Click the central soul sprite to contribute.
+- CPS is measured over a rolling 10-second window.
 - At `CPS >= 5`: add HP at `0.2 × CPS` per second. At exactly 5 CPS this is the specified `+1 HP/s`.
-- At `CPS < 5`: lose `0.2 HP/s`.
-- Generated HP is stored for the team and spent when living players need it.
-- Teams with ghosts do not use normal HP regeneration.
+- At `CPS < 5`: lose `0.2 HP/s` continuously.
+- Team HP has **no maximum cap**.
+- HP bar spans half the screen at the top and shows the numeric HP.
+- With `baseline = 100 × living teammates`, the bar is:
+  - **red** when `hp < baseline`,
+  - **yellow** when `baseline <= hp <= baseline + 90`,
+  - **green** when `hp > baseline + 90`.
+- The bar fill is scaled to `baseline + 90`, clamped at 100%; the numeric HP keeps growing beyond it.
+- Random shapes fade in every 10–30 seconds at random screen positions. Clicking one grants `+5 HP`; missing it has no penalty.
+- Shape types: circle, square, triangle, diamond, star.
 
-Draft pseudocode (`clicker.py`) matches the 10-second window and `0.2 × CPS` gain. Open questions:
+Confirmed by user:
 
-- Confirm whether HP/s should keep scaling above 5 CPS or cap at 1 HP/s.
-- Define the bank cap/decay and the minimum HP floor.
+- Central clickable soul creates team HP.
+- Revived teams with ghosts have no HP cap because they cannot regenerate.
+- Red / yellow / green band thresholds above.
+
+Assumed (change if wrong):
+
+- HP gain keeps scaling above 5 CPS (`0.2 × CPS`) rather than capping at `1 HP/s`.
+- Each collected shape gives `+5 HP`; missed shapes have no penalty.
+- The minimum HP floor is `0`.
+- Ghost stacking behaviour is deferred to the host game; the module tracks one ghost's contribution.
+
+Open questions:
+
+- Define the bank cap/decay once the host team economy exists.
 - Define how multiple ghosts on one team stack.
-- Define whether the penalty is continuous or applied per evaluation window.
+- Confirm the `+5 HP` shape bonus and whether missing should hurt.
 
 ## 2. Bullet Press
 
