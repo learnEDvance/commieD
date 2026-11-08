@@ -63,6 +63,7 @@ node --test
 
 ## Integration notes
 
-- The core exposes `SoulClicker` with `click(nowMs)`, `tick(nowMs, deltaSeconds)`, `cpsAt(nowMs)`, `band`, `hp`, `baseline`, `fillRatio`, `addShapeBonus()`, and `setLivingTeammates(count)`.
+- The core exposes `SoulClicker` with `click(nowMs)`, `advanceTo(nowMs)`, `tick(nowMs, deltaSeconds)`, `cpsAt(nowMs)`, `band`, `hp`, `baseline`, `fillRatio`, `addShapeBonus()`, and `setLivingTeammates(count)`.
+- `click(nowMs)` settles the pending HP change immediately, then records the click. `advanceTo(nowMs)` does the same on every frame, so HP add/subtract follows the CPS counter without waiting.
 - `nowMs` is host-supplied; rules never read the wall clock. The browser layer owns `performance.now()` and `requestAnimationFrame`.
 - The host game should feed the team's living-player count and consume the resulting HP value/resources.

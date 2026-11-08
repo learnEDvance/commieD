@@ -7,6 +7,7 @@ Tick only verified work. One small step at a time.
 - [x] Save the Soul Clicker spec and open questions in `minigames.md`
 - [x] Pure core rules: rolling 10-second CPS window
 - [x] HP gain at `0.2 × CPS` HP/s for 5+ CPS; `−0.2 HP/s` below 5
+- [x] HP settles immediately on each click so the rate switches with CPS at the click moment
 - [x] No maximum HP cap
 - [x] HP bands: red below baseline, yellow through baseline + 90, green above
 - [x] Unit tests for bands, CPS thresholds, no-cap, bonus, teammate changes, click expiry

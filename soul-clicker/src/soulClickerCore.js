@@ -28,6 +28,7 @@ export class SoulClicker {
     this.livingTeammates = livingTeammates;
     this.hp = hp ?? this.baseline;
     this.clickTimestamps = [];
+    this.lastUpdateMs = null;
   }
 
   get baseline() {
@@ -69,9 +70,32 @@ export class SoulClicker {
   }
 
   click(nowMs) {
+    this.advanceTo(nowMs);
     this.clickTimestamps.push(nowMs);
     this.#pruneClicks(nowMs);
     return this.cpsAt(nowMs);
+  }
+
+  /**
+   * Applies the current CPS rate up to `nowMs` and remembers the timestamp.
+   * Called on every frame and on every click so HP responds the moment CPS changes.
+   */
+  advanceTo(nowMs) {
+    if (!Number.isFinite(nowMs)) {
+      return this.hpPerSecondAt(this.lastUpdateMs ?? 0);
+    }
+
+    if (this.lastUpdateMs === null) {
+      this.lastUpdateMs = nowMs;
+      return this.hpPerSecondAt(nowMs);
+    }
+
+    const deltaSeconds = Math.max(0, (nowMs - this.lastUpdateMs) / 1000);
+    this.lastUpdateMs = nowMs;
+
+    return deltaSeconds > 0
+      ? this.tick(nowMs, deltaSeconds)
+      : this.hpPerSecondAt(nowMs);
   }
 
   tick(nowMs, deltaSeconds) {
@@ -81,6 +105,7 @@ export class SoulClicker {
 
     const rate = this.hpPerSecondAt(nowMs);
     this.hp = Math.max(0, this.hp + rate * deltaSeconds);
+    this.lastUpdateMs = nowMs;
     return rate;
   }
 

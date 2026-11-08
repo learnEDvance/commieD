@@ -38,8 +38,9 @@ if (!hpBar || !hpFill || !hpValue || !hpMeta || !soulButton || !shapeLayer) {
   throw new Error('Soul Clicker UI is incomplete');
 }
 
-function updateHud(nowMs, rate) {
+function updateHud(nowMs) {
   const cps = clicker.cpsAt(nowMs);
+  const rate = clicker.hpPerSecondAt(nowMs);
   const rateLabel = `${rate >= 0 ? '+' : ''}${rate.toFixed(1)}`;
 
   hpBar.dataset.band = clicker.band;
@@ -50,7 +51,9 @@ function updateHud(nowMs, rate) {
 }
 
 soulButton.addEventListener('click', () => {
-  clicker.click(performance.now());
+  const nowMs = performance.now();
+  clicker.click(nowMs);
+  updateHud(nowMs);
 });
 
 function spawnShape(plan) {
@@ -88,14 +91,9 @@ function scheduleShape() {
   }, plan.delayMs);
 }
 
-let lastFrameTime = performance.now();
-
 function frame(nowMs) {
-  const deltaSeconds = Math.min((nowMs - lastFrameTime) / 1000, 0.25);
-  lastFrameTime = nowMs;
-
-  const rate = clicker.tick(nowMs, deltaSeconds);
-  updateHud(nowMs, rate);
+  clicker.advanceTo(nowMs);
+  updateHud(nowMs);
 
   window.requestAnimationFrame(frame);
 }

@@ -21,6 +21,7 @@ Rules as implemented:
 - CPS is measured over a rolling 10-second window.
 - At `CPS >= 5`: add HP at `0.2 × CPS` per second. At exactly 5 CPS this is the specified `+1 HP/s`.
 - At `CPS < 5`: lose `0.2 HP/s` continuously.
+- HP is settled immediately on every click (and every frame), so crossing 5 CPS switches from loss to gain at the click itself.
 - Team HP has **no maximum cap**.
 - HP bar spans half the screen at the top and shows the numeric HP.
 - With `baseline = 100 × living teammates`, the bar is:
