@@ -4,7 +4,7 @@
   --slot-width: clamp(23.1px, 4.62vw, 48.3px);
   --slot-gap: clamp(2.1px, 0.735vw, 8.4px);
   --slots: 10;
-  --feed-overshoot: 96px;
+  --manifold-inset: 48px;
 }
 
 * {
@@ -155,8 +155,8 @@ body {
   background: #0b0d0b;
   transform: translate(-50%, -50%);
   transition:
-    transform 460ms cubic-bezier(0.22, 0.8, 0.25, 1),
-    opacity 300ms ease;
+    transform 260ms cubic-bezier(0.22, 0.8, 0.25, 1),
+    opacity 200ms ease;
   will-change: transform, opacity;
 }
 
@@ -228,7 +228,7 @@ body {
   position: absolute;
   top: 50%;
   right: 0;
-  bottom: calc(-1 * var(--feed-overshoot));
+  bottom: 0;
   left: 0;
   z-index: 1;
   display: grid;
@@ -239,8 +239,53 @@ body {
   pointer-events: none;
 }
 
+/* ---------- Main bullet feeder ---------- */
+
+.manifold {
+  position: absolute;
+  right: 0;
+  bottom: var(--manifold-inset);
+  left: 0;
+  z-index: 0;
+  height: 0;
+}
+
+.manifold__line {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: #3a403a;
+}
+
+.manifold__bullet {
+  position: absolute;
+  top: 50%;
+  width: calc(var(--slot-width) * 0.86);
+  height: 16.8px;
+  margin-top: -8.4px;
+  border: 1px solid #3a403a;
+  background: #1a1f1a;
+  animation: manifold-flow 4.8s linear infinite;
+  will-change: left;
+}
+
+@keyframes manifold-flow {
+  from {
+    left: calc(100% + 48px);
+  }
+
+  to {
+    left: -48px;
+  }
+}
+
+/* ---------- Feed lines ---------- */
+
 .feed {
   position: relative;
+  z-index: 1;
   height: 100%;
 }
 
@@ -248,7 +293,7 @@ body {
 .feed__fill {
   position: absolute;
   top: 0;
-  bottom: 0;
+  bottom: var(--manifold-inset);
   left: 50%;
 }
 
@@ -298,9 +343,30 @@ body {
   border-bottom-color: #eb5757;
 }
 
+.feed__junction {
+  position: absolute;
+  bottom: calc(var(--manifold-inset) - 3.5px);
+  left: 50%;
+  z-index: 2;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border: 1px solid #3a403a;
+  border-radius: 50%;
+  background: #0b0d0b;
+}
+
+.feed.is-used .feed__junction {
+  border-color: #6fcf97;
+}
+
+.feed.is-wrong .feed__junction {
+  border-color: #eb5757;
+}
+
 .feed__queue {
   position: absolute;
-  bottom: 0;
+  bottom: var(--manifold-inset);
   left: 50%;
   z-index: 2;
   display: flex;
@@ -351,5 +417,9 @@ body {
   .feed__fill,
   .feed__queue {
     transition: none;
+  }
+
+  .manifold__bullet {
+    animation: none;
   }
 }

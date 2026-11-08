@@ -59,13 +59,13 @@ Purpose: ghosts produce magazines that living teammates load into their guns.
 
 Implemented: `bullet-press/` (ES modules, no dependencies). Tests run with `node --test`.
 
-Layout (top to bottom): sequence presenter → centered full-width magazine line → bullet feeds. The current magazine sits at the center of the screen, with two empty magazines queued to its left and the previous magazine to its right. Each feed line runs from below the bottom of the screen up to the magazine line, has an upward arrowhead, and carries a column of bullets that advances when its slot is loaded. Bullets and feed lines are centered on their slots. Magazine and sequence objects use a 5% larger scale.
+Layout (top to bottom): sequence presenter → centered full-width magazine line → branch lines → single horizontal feeder. The current magazine sits at the center of the screen, with two empty magazines queued to its left and the previous magazine to its right. A continuous stream of bullets enters the feeder from the right and splits into 10 vertical branch lines, one per slot, each carrying a column of bullets up to the magazine. Loading a slot pulls the top bullet from its branch into the magazine and advances the column. Bullets and feed lines are centered on their slots. Magazine and sequence objects use a 5% larger scale.
 
 Rules as implemented:
 
 - One sequence fills one magazine. The sequence is 10 characters drawn from `A–Z`.
 - The player types the sequence in order; lowercase input is accepted.
-- A correct key pulls the top bullet from that slot's feed column into the magazine, advances the column, and fills the slot green.
+- A correct key pulls the top bullet from that slot's branch into the magazine, advances the column, and fills the slot green.
 - A wrong key pulls the top bullet in red, advances the column, fills the slot red, and marks the whole magazine broken.
 - A broken magazine **cannot be discarded immediately**. It stays until every slot is filled.
 - When all slots are filled, the line shifts right: the current magazine becomes the previous one, a waiting magazine moves to the center, and a new empty magazine enters from the left. Older previous magazines slide farther right and fade out.

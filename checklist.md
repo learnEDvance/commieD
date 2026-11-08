@@ -30,6 +30,9 @@ Tick only verified work. One small step at a time.
 - [x] Upward arrowheads on every feed line
 - [x] Two empty magazines queued left of current; previous magazine kept on the right
 - [x] Feed lines fill upward when a slot is loaded (green correct, red wrong)
+- [x] Single horizontal feeder from the right splits into 10 vertical bullet branches
+- [x] Continuous bullet stream along the main feeder
+- [x] Magazine shift animation shortened by 200ms
 - [x] Feed bullets centered on their lines and sized to the slots
 - [x] Bullet columns run up every feed and advance when a slot loads
 - [x] Sequence presenter sits above the magazine line

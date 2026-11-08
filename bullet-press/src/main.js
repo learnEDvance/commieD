@@ -27,12 +27,14 @@ if (
 }
 
 const EJECT_DELAY_MS = 420;
-const SHIFT_MS = 500;
+const SHIFT_MS = 300;
 const MAGAZINE_GAP_PX = 48;
 const FLY_DURATION_MS = 220;
 const BULLET_PITCH_PX = 24.8;
 const BULLET_GAP_PX = 8;
 const FEED_TOP_MARGIN_PX = 32;
+const MANIFOLD_DURATION_MS = 4800;
+const MANIFOLD_SPACING_PX = 88;
 const reduceMotion = window.matchMedia
   ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
   : false;
@@ -40,10 +42,46 @@ const reduceMotion = window.matchMedia
 const feedEls = [];
 const lineEntries = [];
 let currentEntry = null;
+let manifoldEl = null;
 let docked = false;
 let shiftTimer = null;
 
 document.documentElement.style.setProperty('--slots', String(core.config.sequenceLength));
+
+function getManifoldInset() {
+  const value = Number.parseFloat(
+    getComputedStyle(document.documentElement).getPropertyValue('--manifold-inset'),
+  );
+  return Number.isFinite(value) ? value : 48;
+}
+
+function buildManifold() {
+  if (!manifoldEl) {
+    return;
+  }
+
+  manifoldEl.replaceChildren();
+
+  const line = document.createElement('span');
+  line.className = 'manifold__line';
+  manifoldEl.append(line);
+
+  const count = Math.max(8, Math.ceil(window.innerWidth / MANIFOLD_SPACING_PX));
+
+  for (let i = 0; i < count; i += 1) {
+    const bullet = document.createElement('span');
+    bullet.className = 'manifold__bullet';
+
+    if (reduceMotion) {
+      bullet.style.left = `${(i / count) * 100}%`;
+    } else {
+      bullet.style.animationDuration = `${MANIFOLD_DURATION_MS}ms`;
+      bullet.style.animationDelay = `${-(i / count) * MANIFOLD_DURATION_MS}ms`;
+    }
+
+    manifoldEl.append(bullet);
+  }
+}
 
 function createFeedBullet() {
   const bullet = document.createElement('span');
@@ -61,7 +99,7 @@ function refillFeedQueue(feed) {
   queue.replaceChildren();
   queue.style.setProperty('--queue-shift', '0px');
 
-  const height = feed.clientHeight || feedsEl.clientHeight;
+  const height = (feed.clientHeight || feedsEl.clientHeight) - getManifoldInset();
   const count = Math.max(
     1,
     Math.floor((height - FEED_TOP_MARGIN_PX + BULLET_GAP_PX) / BULLET_PITCH_PX),
@@ -81,6 +119,11 @@ function buildFeeds() {
   feedsEl.replaceChildren();
   feedEls.length = 0;
 
+  manifoldEl = document.createElement('div');
+  manifoldEl.className = 'manifold';
+  manifoldEl.setAttribute('aria-hidden', 'true');
+  feedsEl.append(manifoldEl);
+
   for (let i = 0; i < core.config.sequenceLength; i += 1) {
     const feed = document.createElement('div');
     feed.className = 'feed';
@@ -95,13 +138,18 @@ function buildFeeds() {
     const arrow = document.createElement('span');
     arrow.className = 'feed__arrow';
 
+    const junction = document.createElement('span');
+    junction.className = 'feed__junction';
+
     const queue = document.createElement('div');
     queue.className = 'feed__queue';
 
-    feed.append(line, fill, arrow, queue);
+    feed.append(line, fill, arrow, junction, queue);
     feedsEl.append(feed);
     feedEls.push(feed);
   }
+
+  buildManifold();
 
   for (const feed of feedEls) {
     refillFeedQueue(feed);
@@ -407,6 +455,7 @@ window.addEventListener('keydown', (event) => {
 
 window.addEventListener('resize', () => {
   positionMagazines();
+  buildManifold();
   for (const feed of feedEls) {
     refillFeedQueue(feed);
   }
