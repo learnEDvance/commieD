@@ -14,7 +14,7 @@ From top to bottom:
 
 1. **Sequence presenter** — the characters to type; the next one is highlighted. It sits above the magazine line.
 2. **Magazine line** — a full-width conveyor centered in the middle of the screen. The current 10-slot magazine sits on the line, with two empty magazines queued to its left and the previous magazine (if any) to its right.
-3. **Bullet feeds** — one vertical feed line per slot. Each line runs from below the bottom of the screen up to the magazine line and has an upward arrowhead. A correct key fills that feed upward in green and pulls its bullet up into the magazine; a wrong key fills it red.
+3. **Bullet feeds** — one vertical feed line per slot. Each line runs from below the bottom of the screen up to the magazine line and has an upward arrowhead, with its bullet centered at the lower end. A correct key fills that feed upward in green and pulls its bullet up into the magazine; a wrong key fills it red.
 4. When all slots are filled, the line shifts right: the current magazine becomes the previous one, a waiting magazine slides into the center, and a fresh empty magazine enters from the left. Older previous magazines slide farther right and fade out.
 5. Magazine and sequence objects use a 5% larger scale than the base layout.
 

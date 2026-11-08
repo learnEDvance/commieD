@@ -59,7 +59,7 @@ Purpose: ghosts produce magazines that living teammates load into their guns.
 
 Implemented: `bullet-press/` (ES modules, no dependencies). Tests run with `node --test`.
 
-Layout (top to bottom): sequence presenter → centered full-width magazine line → bullet feeds. The current magazine sits at the center of the screen, with two empty magazines queued to its left and the previous magazine to its right. Each feed line runs from below the bottom of the screen up to the magazine line, has an upward arrowhead, and fills upward as its slot is loaded. Magazine and sequence objects use a 5% larger scale.
+Layout (top to bottom): sequence presenter → centered full-width magazine line → bullet feeds. The current magazine sits at the center of the screen, with two empty magazines queued to its left and the previous magazine to its right. Each feed line runs from below the bottom of the screen up to the magazine line, has an upward arrowhead, and fills upward as its slot is loaded. Bullets and feed lines are centered on their slots. Magazine and sequence objects use a 5% larger scale.
 
 Rules as implemented:
 

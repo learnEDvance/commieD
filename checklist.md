@@ -30,6 +30,7 @@ Tick only verified work. One small step at a time.
 - [x] Upward arrowheads on every feed line
 - [x] Two empty magazines queued left of current; previous magazine kept on the right
 - [x] Feed lines fill upward when a slot is loaded (green correct, red wrong)
+- [x] Feed bullets centered on their lines and sized to the slots
 - [x] Sequence presenter sits above the magazine line
 - [x] Instruction hint removed from the playfield
 - [x] Letters-only sequences and input (no digits or punctuation)

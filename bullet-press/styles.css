@@ -256,12 +256,14 @@ body {
 }
 
 .feed__line {
+  z-index: 0;
   width: 1px;
   margin-left: -0.5px;
   background: #2a2f2a;
 }
 
 .feed__fill {
+  z-index: 1;
   width: 2px;
   margin-left: -1px;
   background: #6fcf97;
@@ -282,6 +284,7 @@ body {
   position: absolute;
   top: 12.6px;
   left: 50%;
+  z-index: 1;
   width: 0;
   height: 0;
   margin-left: -5.25px;
@@ -299,7 +302,9 @@ body {
 }
 
 .feed__bullet {
-  width: 35.7px;
+  position: relative;
+  z-index: 2;
+  width: calc(var(--slot-width) * 0.86);
   height: 16.8px;
   margin-bottom: 120px;
   border: 1px solid #3a403a;
