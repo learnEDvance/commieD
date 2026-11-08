@@ -1,6 +1,6 @@
 # commieD — Minigame Specs
 
-Status: Soul Clicker implemented under `soul-clicker/`; Bullet Press, Stewed Luck, and Dash Supplement Factory not started. `idea.md` is still the product source of truth; this file records the working details and open questions for the ghost minigames.
+Status: Soul Clicker implemented under `soul-clicker/`; Bullet Press implemented under `bullet-press/`; Stewed Luck and Dash Supplement Factory not started. `idea.md` is still the product source of truth; this file records the working details and open questions for the ghost minigames.
 
 ## Shared contract
 
@@ -57,28 +57,37 @@ Open questions:
 
 Purpose: ghosts produce magazines that living teammates load into their guns.
 
-Intended rules from `idea.md`:
+Implemented: `bullet-press/` (ES modules, no dependencies). Tests run with `node --test`.
 
-- The player follows a keyboard instruction sequence to make a magazine.
-- A magazine is rejected if the sequence is not perfect.
-- The whole sequence must be completed before the next manufacturing run starts.
-- Mistakes control a production multiplier: it falls toward `0.5x` on every mistake and rises slowly toward `5x` during a long clean streak.
+Rules as implemented:
 
-Draft pseudocode (`bulletpress.py`) currently:
+- A run shows a 10-character sequence drawn from `A–Z` and `0–9`.
+- The player types the sequence in order; lowercase input is accepted.
+- A correct key loads 1 bullet into the current magazine. The typed rectangle moves left into the magazine.
+- A wrong key drops its typed rectangle, marks the current magazine broken, advances to the next sequence character, and lowers the multiplier by `0.1` (floor `0.5x`).
+- A magazine holds 5 bullets:
+  - perfect magazine → adds `multiplier` magazines to production, raises the multiplier by `0.1` (cap `5x`), resets nothing else;
+  - broken magazine → produces nothing, increments the broken count.
+- A broken magazine **cannot be discarded immediately**. It stays until it fills 5 bullets or the run ends.
+- A clean partial magazine carries into the next run; a partial broken magazine is discarded when the run ends.
+- Production is accumulated as a float; `takeMagazines()` returns whole magazines to the host and keeps the remainder.
+- The next run starts automatically 700 ms after a run completes.
+- Sequences come from a seeded RNG (or an injected RNG), never `Math.random()`.
 
-- Generates a 10-character sequence.
-- A correct key adds one bullet.
-- A wrong key removes one bullet (not below zero).
-- Every 5 bullets creates one magazine.
-- Advances by removing the first sequence entry.
+Assumed (change if wrong):
 
-Open questions to resolve before building:
+- The sequence is 10 characters and a magazine holds 5 bullets, so one perfect run yields 2 magazines.
+- Letters and digits only, to avoid punctuation/layout issues from the draft pseudocode.
+- Input is keyboard-only; no on-screen keypad yet.
+- The multiplier scales magazines produced per perfect magazine (`production += multiplier`).
+- Broken magazines are counted per discarded magazine, not per mistake.
+- No Q pause; `Q` is a valid sequence character.
 
-- Should one mistake reject the magazine immediately (idea) or only reduce the bullet count (pseudocode)?
-- Is the sequence fixed at 10 entries, and how many bullets/magazines should one run produce?
-- Define exact multiplier values, increments, decay, and the clean-streak duration.
-- Handle shifted punctuation and keyboard layout differences.
-- Use the simulation's seeded RNG, not `Math.random()`.
+Open questions:
+
+- Confirm that a broken magazine auto-discards at run end rather than blocking the next run.
+- Confirm a clean partial magazine should carry across runs.
+- Confirm whether production should be whole magazines only in the host economy.
 
 ## 3. Stewed Luck
 

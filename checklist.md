@@ -22,10 +22,16 @@ Tick only verified work. One small step at a time.
 
 ## Bullet Press
 
-- [ ] Resolve sequence/perfect-run rules with the user
-- [ ] Implement core sequence + magazine rules
-- [ ] Implement production multiplier
-- [ ] Browser shell and dummy assets
+- [x] Resolve sequence/perfect-run rules in `minigames.md`
+- [x] Implement core sequence + magazine rules
+- [x] Implement production multiplier
+- [x] Broken magazines stay until they fill or the run ends
+- [x] Unit tests for sequences, magazines, broken magazines, multiplier, production
+- [x] Browser shell: central code, typed rectangles, left-sliding magazine load
+- [x] Run instructions and rules documented in `bullet-press/README.md`
+- [ ] Confirm auto-discard at run end and partial-magazine carry-over with the user
+- [ ] Integrate `takeMagazines()` with the host magazine/resource API (waiting on host game)
+- [ ] Replace placeholder rectangles with final art
 
 ## Stewed Luck
 

@@ -16,7 +16,7 @@
 - The workspace was intentionally cleared and is now minigame-only. There is no root `package.json` or shared tooling; each minigame is self-contained.
 - Previous main-game code was deleted on purpose. Do not recover it from git history.
 - The `.py` files and `dash supplement factory` notes are user-written draft pseudocode, not production implementations.
-- Soul Clicker is implemented in `soul-clicker/` (vanilla ES modules + `node --test`). Other minigames are not started.
+- Soul Clicker is implemented in `soul-clicker/` and Bullet Press in `bullet-press/` (vanilla ES modules + `node --test`). Stewed Luck and Dash Supplement Factory are not started.
 
 ## Integration contract
 - Build each minigame as a self-contained module with a narrow interface: explicit inputs/state in, resources/events out.
