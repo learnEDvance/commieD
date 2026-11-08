@@ -5,6 +5,7 @@
   --slot-gap: clamp(2.1px, 0.735vw, 8.4px);
   --slots: 10;
   --manifold-inset: 48px;
+  --feed-lift: 20px;
 }
 
 * {
@@ -246,8 +247,9 @@ body {
   right: 0;
   bottom: var(--manifold-inset);
   left: 0;
-  z-index: 0;
+  z-index: 3;
   height: 0;
+  pointer-events: none;
 }
 
 .manifold__line {
@@ -255,30 +257,42 @@ body {
   top: 0;
   right: 0;
   left: 0;
+  z-index: 0;
   height: 2px;
   background: #3a403a;
+}
+
+.manifold__terminus {
+  position: absolute;
+  top: -5px;
+  left: 0;
+  z-index: 1;
+  width: 2px;
+  height: 12px;
+  background: #3a403a;
+}
+
+.manifold__track {
+  position: absolute;
+  top: -12px;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  height: 24px;
+  overflow: hidden;
 }
 
 .manifold__bullet {
   position: absolute;
   top: 50%;
+  left: 0;
   width: calc(var(--slot-width) * 0.86);
   height: 16.8px;
   margin-top: -8.4px;
   border: 1px solid #3a403a;
   background: #1a1f1a;
-  animation: manifold-flow 4.8s linear infinite;
-  will-change: left;
-}
-
-@keyframes manifold-flow {
-  from {
-    left: calc(100% + 48px);
-  }
-
-  to {
-    left: -48px;
-  }
+  transition: transform 220ms ease-out;
+  will-change: transform;
 }
 
 /* ---------- Feed lines ---------- */
@@ -366,24 +380,40 @@ body {
 
 .feed__queue {
   position: absolute;
-  bottom: var(--manifold-inset);
+  bottom: calc(var(--manifold-inset) + var(--feed-lift));
   left: 50%;
   z-index: 2;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
   width: calc(var(--slot-width) * 0.86);
-  transform: translateX(-50%) translateY(var(--queue-shift, 0px));
-  transition: transform 220ms ease-out;
-  will-change: transform;
+  height: 0;
+  transform: translateX(-50%);
 }
 
 .feed__bullet {
-  flex: 0 0 auto;
+  position: absolute;
+  bottom: 0;
+  left: 0;
   width: 100%;
   height: 16.8px;
   border: 1px solid #3a403a;
   background: #1a1f1a;
+  transition: transform 220ms ease-out;
+  will-change: transform;
+}
+
+.feed__bullet.is-entering {
+  animation: feed-rise 260ms ease-out;
+}
+
+@keyframes feed-rise {
+  from {
+    transform: translateY(var(--feed-lift));
+    opacity: 0.4;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .feed.is-used .feed__line {
@@ -415,11 +445,12 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .magazine,
   .feed__fill,
-  .feed__queue {
+  .feed__bullet,
+  .manifold__bullet {
     transition: none;
   }
 
-  .manifold__bullet {
+  .feed__bullet.is-entering {
     animation: none;
   }
 }

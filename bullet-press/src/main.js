@@ -33,53 +33,112 @@ const FLY_DURATION_MS = 220;
 const BULLET_PITCH_PX = 24.8;
 const BULLET_GAP_PX = 8;
 const FEED_TOP_MARGIN_PX = 32;
-const MANIFOLD_DURATION_MS = 4800;
-const MANIFOLD_SPACING_PX = 88;
+const TRUNK_SHIFT_MS = 220;
 const reduceMotion = window.matchMedia
   ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
   : false;
 
 const feedEls = [];
 const lineEntries = [];
+const trunkBullets = [];
 let currentEntry = null;
 let manifoldEl = null;
+let manifoldTrack = null;
+let trunkPitch = 0;
+let trunkSerial = 0;
 let docked = false;
 let shiftTimer = null;
 
 document.documentElement.style.setProperty('--slots', String(core.config.sequenceLength));
 
-function getManifoldInset() {
+function getCssPx(name, fallback) {
   const value = Number.parseFloat(
-    getComputedStyle(document.documentElement).getPropertyValue('--manifold-inset'),
+    getComputedStyle(document.documentElement).getPropertyValue(name),
   );
-  return Number.isFinite(value) ? value : 48;
+  return Number.isFinite(value) ? value : fallback;
 }
 
-function buildManifold() {
-  if (!manifoldEl) {
+function getManifoldInset() {
+  return getCssPx('--manifold-inset', 48);
+}
+
+function getFeedLift() {
+  return getCssPx('--feed-lift', 20);
+}
+
+function createTrunkBullet() {
+  const bullet = document.createElement('span');
+  bullet.className = 'manifold__bullet';
+  bullet.dataset.id = String(trunkSerial);
+  trunkSerial += 1;
+  return bullet;
+}
+
+function buildTrunk() {
+  if (!manifoldEl || !manifoldTrack || feedEls.length === 0) {
     return;
   }
 
-  manifoldEl.replaceChildren();
+  manifoldTrack.replaceChildren();
+  trunkBullets.length = 0;
 
-  const line = document.createElement('span');
-  line.className = 'manifold__line';
-  manifoldEl.append(line);
+  const first = feedEls[0];
+  const feedsRect = feedsEl.getBoundingClientRect();
+  const firstRect = first.getBoundingClientRect();
+  const bulletWidth = firstRect.width * 0.86;
+  const branchCenter = firstRect.left + firstRect.width / 2 - feedsRect.left;
 
-  const count = Math.max(8, Math.ceil(window.innerWidth / MANIFOLD_SPACING_PX));
+  manifoldEl.style.left = `${Math.max(0, branchCenter - bulletWidth / 2)}px`;
+
+  trunkPitch =
+    feedEls.length > 1
+      ? feedEls[1].getBoundingClientRect().left - firstRect.left
+      : firstRect.width;
+
+  if (trunkPitch <= 0) {
+    trunkPitch = firstRect.width;
+  }
+
+  const width = feedsRect.width - Number.parseFloat(manifoldEl.style.left || '0');
+  const count = Math.max(2, Math.ceil(width / trunkPitch) + 2);
 
   for (let i = 0; i < count; i += 1) {
-    const bullet = document.createElement('span');
-    bullet.className = 'manifold__bullet';
+    const bullet = createTrunkBullet();
+    bullet.style.transform = `translateX(${i * trunkPitch}px)`;
+    manifoldTrack.append(bullet);
+    trunkBullets.push(bullet);
+  }
+}
 
-    if (reduceMotion) {
-      bullet.style.left = `${(i / count) * 100}%`;
-    } else {
-      bullet.style.animationDuration = `${MANIFOLD_DURATION_MS}ms`;
-      bullet.style.animationDelay = `${-(i / count) * MANIFOLD_DURATION_MS}ms`;
-    }
+function advanceTrunk() {
+  if (trunkBullets.length === 0 || trunkPitch <= 0) {
+    return;
+  }
 
-    manifoldEl.append(bullet);
+  const leaving = trunkBullets.shift();
+
+  if (leaving) {
+    leaving.dataset.leaving = 'true';
+    leaving.style.transform = `translateX(${-trunkPitch}px)`;
+    window.setTimeout(() => leaving.remove(), reduceMotion ? 0 : TRUNK_SHIFT_MS + 60);
+  }
+
+  trunkBullets.forEach((bullet, index) => {
+    bullet.style.transform = `translateX(${index * trunkPitch}px)`;
+  });
+
+  const targetIndex = trunkBullets.length;
+  const bullet = createTrunkBullet();
+  bullet.style.transform = `translateX(${(targetIndex + 1) * trunkPitch}px)`;
+  manifoldTrack.append(bullet);
+  trunkBullets.push(bullet);
+
+  if (reduceMotion) {
+    bullet.style.transform = `translateX(${targetIndex * trunkPitch}px)`;
+  } else {
+    window.requestAnimationFrame(() => {
+      bullet.style.transform = `translateX(${targetIndex * trunkPitch}px)`;
+    });
   }
 }
 
@@ -97,22 +156,42 @@ function refillFeedQueue(feed) {
   }
 
   queue.replaceChildren();
-  queue.style.setProperty('--queue-shift', '0px');
 
-  const height = (feed.clientHeight || feedsEl.clientHeight) - getManifoldInset();
+  const height =
+    (feed.clientHeight || feedsEl.clientHeight) - getManifoldInset() - getFeedLift();
   const count = Math.max(
     1,
     Math.floor((height - FEED_TOP_MARGIN_PX + BULLET_GAP_PX) / BULLET_PITCH_PX),
   );
 
   for (let i = 0; i < count; i += 1) {
-    queue.append(createFeedBullet());
+    const bullet = createFeedBullet();
+    bullet.style.transform = `translateY(${-i * BULLET_PITCH_PX}px)`;
+    queue.append(bullet);
+  }
+}
+
+function advanceFeed(feed) {
+  const queue = feed.querySelector('.feed__queue');
+
+  if (!queue) {
+    return;
   }
 
-  if (feed.classList.contains('is-used')) {
-    queue.firstElementChild?.remove();
-    queue.style.setProperty('--queue-shift', `-${BULLET_PITCH_PX}px`);
-  }
+  const bullets = [...queue.querySelectorAll('.feed__bullet')];
+  bullets.at(-1)?.remove();
+
+  bullets.slice(0, -1).forEach((bullet, index) => {
+    bullet.style.transform = `translateY(${-(index + 1) * BULLET_PITCH_PX}px)`;
+  });
+
+  const bullet = createFeedBullet();
+  bullet.style.transform = 'translateY(0)';
+  bullet.classList.add('is-entering');
+  bullet.addEventListener('animationend', () => {
+    bullet.classList.remove('is-entering');
+  });
+  queue.append(bullet);
 }
 
 function buildFeeds() {
@@ -122,6 +201,17 @@ function buildFeeds() {
   manifoldEl = document.createElement('div');
   manifoldEl.className = 'manifold';
   manifoldEl.setAttribute('aria-hidden', 'true');
+
+  const line = document.createElement('span');
+  line.className = 'manifold__line';
+
+  const terminus = document.createElement('span');
+  terminus.className = 'manifold__terminus';
+
+  manifoldTrack = document.createElement('div');
+  manifoldTrack.className = 'manifold__track';
+
+  manifoldEl.append(line, terminus, manifoldTrack);
   feedsEl.append(manifoldEl);
 
   for (let i = 0; i < core.config.sequenceLength; i += 1) {
@@ -149,7 +239,7 @@ function buildFeeds() {
     feedEls.push(feed);
   }
 
-  buildManifold();
+  buildTrunk();
 
   for (const feed of feedEls) {
     refillFeedQueue(feed);
@@ -386,10 +476,10 @@ function handleInput(char) {
     feed?.classList.add('is-wrong');
   }
 
-  topBullet?.remove();
-  feed
-    ?.querySelector('.feed__queue')
-    ?.style.setProperty('--queue-shift', `-${BULLET_PITCH_PX}px`);
+  if (feed) {
+    advanceFeed(feed);
+  }
+  advanceTrunk();
 
   if (core.complete) {
     docked = false;
@@ -455,7 +545,7 @@ window.addEventListener('keydown', (event) => {
 
 window.addEventListener('resize', () => {
   positionMagazines();
-  buildManifold();
+  buildTrunk();
   for (const feed of feedEls) {
     refillFeedQueue(feed);
   }

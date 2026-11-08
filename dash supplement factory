@@ -1,0 +1,27 @@
+process:
+start
+    |
+    V
+take a pot(max 5 in a batch)
+    |
+    V
+add vodka
+    |
+    v
+hold to stir
+    |
+    v
+add national spirit
+    |
+    v
+Heat by holding mouse
+    |
+    v
+take pot from main station to bottling station
+    |
+    v
+click on machine to bottle the potions. 1pot=20secs of speed. 1 bottle=1second
+
+
+
+in case of any mistake in the order. the whole batch is wasted and must be destroyed.

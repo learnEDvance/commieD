@@ -37,15 +37,11 @@ Health regeneration rules
 - Teams with ghosts cannot regenerate HP normally.
 - Teams with ghosts depend on ghost-generated HP instead.
 06 — Bullet Press
-- Bullet Press is a factory-themed minigame.
-- Ghosts work in a virtual bullet factory.the following are the minigames inside this minigame. multiple players can work together to play here. 
--the ghosts hold onto a furnace for 5secs to keep it heated for 20secs for melting iron pigs into molten iron
-- Ghost drag down a press onto the molten iron to create sheets
--sheets are clamped down by a cutter that needs constant clicking for 5 secs by the ghost for it to run 25seconds. the cutter cuts the sheets into bullets
-- Ghosts load the cut bullets into magazines by holding onto the magazines and letting go when the magazine is filled..
-- The produced ammunition is supplied to living teammates.
-- The objective is to maintain the team's ammunition supply.
-07 — voodoo magicania:
--on every kill by the live players, the team gets killmit. which can be used to spin a random voodoo pot to get any special powerup in the game.
-08-speed supplement factory
--spin a huge wheel with mouse as fast as possible to make speed seconds. which the players can use for faster speed.
+-follow keyboard instructions to create magazines
+-magazines can be rejected if the instructions followed are not perfect.
+-the entire sequence must be completed for the next magazine manufacturing run.
+-mistakes per magazine control a multiplier, if there are no magazine errors for a long time, the multiplier increases slwoly upto 5x. but reduces on tevery mistake till it is 0.5x production.
+07 — stewedluck:
+-on every kill by the live players, the team gets killmit. which can be used to spin a stew pot to get any special powerup in the game.(communist engineering)
+08-dash supplement factory
+-its a factory type click game where you click on the machines to create dash seconds.
