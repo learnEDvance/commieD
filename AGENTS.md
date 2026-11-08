@@ -4,16 +4,19 @@
 - This repository is now **only for ghost minigames**. Another developer owns the main game: maze, movement, combat, teams, death/revival, and multiplayer.
 - Do not build or modify main-game systems here, and do not restore the old client/server/shared implementation.
 - Minigames:
-  - Soul Contribution (HP clicker)
+  - Soul Clicker (Soul Contribution / HP clicker)
   - Bullet Press
-  - Voodoo Magicania (power-up spin)
+  - Stewed Luck (power-up spin)
   - Dash Supplement Factory
+- `minigames.md` holds the working specs, pseudocode notes, and unresolved questions. Read it before implementing.
 - `idea.md` is the product source of truth. Never edit it.
 - `checklist.md` is intentionally empty. Add only minigame tasks and tick items only after verification.
 
 ## Current state
 - The workspace was intentionally cleared: no `package.json`, source, tests, or tooling. Do not assume npm commands exist.
 - Previous code was deleted on purpose. Do not recover it from git history.
+- The `.py` files are user-written draft pseudocode, not production implementations.
+- No minigame implementation has started yet; wait for the user to choose the next step.
 
 ## Integration contract
 - Build each minigame as a self-contained module with a narrow interface: explicit inputs/state in, resources/events out.
@@ -22,10 +25,10 @@
 - Use placeholder assets until real assets arrive, and keep asset paths centralized.
 
 ## Minigame rules to follow
-- **Soul:** at 5 CPS generate +1 HP/s, banked until needed; below 5 CPS lose 0.2 HP/s. Normal team regen is disabled while ghosts exist.
+- **Soul Clicker:** at 5 CPS generate +1 HP/s, banked until needed; below 5 CPS lose 0.2 HP/s. Normal team regen is disabled while ghosts exist.
 - **Bullet Press:** players follow keyboard sequences to make magazines. Imperfect magazines are rejected and the sequence restarts. Mistakes drop the production multiplier toward 0.5x; a long clean streak raises it slowly to 5x.
-- **Voodoo Magicania:** live-player kills earn killmit; spend it to spin for a weighted random power-up.
-- **Dash Factory:** click factory machines to produce dash seconds.
+- **Stewed Luck:** live-player kills earn killmit; spend it to spin the pot for a special power-up.
+- **Dash Supplement Factory:** follow the pot-preparation order exactly; any mistake destroys the whole batch. 1 pot = 20 seconds of speed, 1 bottle = 1 second.
 
 ## Rules
 - One small step at a time; do not scaffold the whole system at once.
