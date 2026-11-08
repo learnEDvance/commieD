@@ -30,6 +30,9 @@ const EJECT_DELAY_MS = 420;
 const SHIFT_MS = 500;
 const MAGAZINE_GAP_PX = 48;
 const FLY_DURATION_MS = 220;
+const BULLET_PITCH_PX = 24.8;
+const BULLET_GAP_PX = 8;
+const FEED_TOP_MARGIN_PX = 32;
 const reduceMotion = window.matchMedia
   ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
   : false;
@@ -41,6 +44,38 @@ let docked = false;
 let shiftTimer = null;
 
 document.documentElement.style.setProperty('--slots', String(core.config.sequenceLength));
+
+function createFeedBullet() {
+  const bullet = document.createElement('span');
+  bullet.className = 'feed__bullet';
+  return bullet;
+}
+
+function refillFeedQueue(feed) {
+  const queue = feed.querySelector('.feed__queue');
+
+  if (!queue) {
+    return;
+  }
+
+  queue.replaceChildren();
+  queue.style.setProperty('--queue-shift', '0px');
+
+  const height = feed.clientHeight || feedsEl.clientHeight;
+  const count = Math.max(
+    1,
+    Math.floor((height - FEED_TOP_MARGIN_PX + BULLET_GAP_PX) / BULLET_PITCH_PX),
+  );
+
+  for (let i = 0; i < count; i += 1) {
+    queue.append(createFeedBullet());
+  }
+
+  if (feed.classList.contains('is-used')) {
+    queue.firstElementChild?.remove();
+    queue.style.setProperty('--queue-shift', `-${BULLET_PITCH_PX}px`);
+  }
+}
 
 function buildFeeds() {
   feedsEl.replaceChildren();
@@ -60,18 +95,23 @@ function buildFeeds() {
     const arrow = document.createElement('span');
     arrow.className = 'feed__arrow';
 
-    const bullet = document.createElement('span');
-    bullet.className = 'feed__bullet';
+    const queue = document.createElement('div');
+    queue.className = 'feed__queue';
 
-    feed.append(line, fill, arrow, bullet);
+    feed.append(line, fill, arrow, queue);
     feedsEl.append(feed);
     feedEls.push(feed);
+  }
+
+  for (const feed of feedEls) {
+    refillFeedQueue(feed);
   }
 }
 
 function resetFeeds() {
   for (const feed of feedEls) {
     feed.classList.remove('is-used', 'is-wrong');
+    refillFeedQueue(feed);
   }
 }
 
@@ -284,7 +324,8 @@ function handleInput(char) {
 
   const slotIndex = core.index;
   const feed = feedEls[slotIndex];
-  const startRect = feed?.querySelector('.feed__bullet')?.getBoundingClientRect();
+  const topBullet = feed?.querySelector('.feed__bullet');
+  const startRect = topBullet?.getBoundingClientRect();
 
   const event = core.press(char, performance.now());
 
@@ -296,6 +337,11 @@ function handleInput(char) {
   if (event.type === 'wrong') {
     feed?.classList.add('is-wrong');
   }
+
+  topBullet?.remove();
+  feed
+    ?.querySelector('.feed__queue')
+    ?.style.setProperty('--queue-shift', `-${BULLET_PITCH_PX}px`);
 
   if (core.complete) {
     docked = false;
@@ -359,7 +405,12 @@ window.addEventListener('keydown', (event) => {
   handleInput(char);
 });
 
-window.addEventListener('resize', positionMagazines);
+window.addEventListener('resize', () => {
+  positionMagazines();
+  for (const feed of feedEls) {
+    refillFeedQueue(feed);
+  }
+});
 
 buildFeeds();
 setupLine();
