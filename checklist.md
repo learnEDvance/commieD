@@ -23,7 +23,10 @@ Tick only verified work. One small step at a time.
 ## Bullet Press
 
 - [x] Resolve sequence/perfect-run rules in `minigames.md`
-- [x] One sequence fills one magazine (5 slots)
+- [x] One sequence fills one magazine (10 slots)
+- [x] Full-width magazine line with feed lines running from below the screen up to it
+- [x] Sequence presenter sits above the magazine line
+- [x] Instruction hint removed from the playfield
 - [x] Letters-only sequences and input (no digits or punctuation)
 - [x] Vertical presenter → magazine → bullet-feed layout
 - [x] Correct keys pull green bullets up; wrong keys leave red slots

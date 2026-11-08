@@ -103,7 +103,7 @@ function renderCode() {
       ? `BROKEN · ${seconds}s`
       : `PERFECT · x${core.lastMultiplier} · ${seconds}s`;
   } else {
-    codeStatus.textContent = 'Type the highlighted character';
+    codeStatus.textContent = '';
   }
 }
 

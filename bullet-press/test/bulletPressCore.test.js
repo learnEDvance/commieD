@@ -30,14 +30,31 @@ test('generates the same sequence from the same seed', () => {
   }
 });
 
-test('uses letters only by default', () => {
+test('uses 10 letters only by default', () => {
+  assert.equal(DEFAULT_CONFIG.sequenceLength, 10);
   assert.equal(DEFAULT_CONFIG.charset, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
   assert.ok(!/[0-9]/.test(DEFAULT_CONFIG.charset));
 
   const core = new BulletPress({ seed: 7 });
+  assert.equal(core.sequence.length, 10);
   for (const char of core.sequence) {
     assert.match(char, /^[A-Z]$/);
   }
+});
+
+test('a default magazine fills after 10 keys', () => {
+  const core = new BulletPress({ rng: () => 0 });
+  core.start(0);
+
+  let event = null;
+  for (let i = 0; i < 10; i += 1) {
+    event = core.press('A', 500 + i * 500);
+  }
+
+  assert.equal(event.complete, true);
+  assert.equal(core.filled, 10);
+  assert.equal(event.multiplier, 4);
+  assert.equal(core.production, 4);
 });
 
 test('ignores digits and punctuation without breaking the magazine', () => {

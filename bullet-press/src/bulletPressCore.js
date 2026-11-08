@@ -1,5 +1,5 @@
 export const DEFAULT_CONFIG = Object.freeze({
-  sequenceLength: 5,
+  sequenceLength: 10,
   charset: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
   maxMultiplier: 5,
   // Average time per key for each whole-number multiplier. Slower than the

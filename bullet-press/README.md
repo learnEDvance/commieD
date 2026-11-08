@@ -13,13 +13,13 @@ This module is self-contained:
 From top to bottom:
 
 1. **Sequence presenter** — the characters to type; the next one is highlighted.
-2. **Magazine loading area** — a horizontal magazine with one slot per sequence character.
-3. **Bullet feeds** — one vertical feed line per slot. A correct key pulls that feed’s bullet up into the magazine.
+2. **Magazine loading area** — a full-width assembly line with a 10-slot magazine.
+3. **Bullet feeds** — one vertical feed line per slot. Each line runs from below the bottom of the screen up to the magazine line. A correct key pulls that feed’s bullet up into the magazine.
 4. The completed magazine slides right and the next magazine slides in from the left.
 
 ## Rules implemented
 
-- One sequence is 5 characters drawn from `A–Z`.
+- One sequence is 10 characters drawn from `A–Z`.
 - A correct key fills the next magazine slot green and consumes that feed’s bullet.
 - A wrong key fills the next slot red and marks the whole magazine broken.
 - A broken magazine **cannot be discarded immediately**. It stays until every slot is filled.

@@ -59,11 +59,11 @@ Purpose: ghosts produce magazines that living teammates load into their guns.
 
 Implemented: `bullet-press/` (ES modules, no dependencies). Tests run with `node --test`.
 
-Layout (top to bottom): sequence presenter → magazine loading area → bullet feeds.
+Layout (top to bottom): sequence presenter → full-width magazine line → bullet feeds. Each feed line runs from below the bottom of the screen up to the magazine line.
 
 Rules as implemented:
 
-- One sequence fills one magazine. The sequence is 5 characters drawn from `A–Z`.
+- One sequence fills one magazine. The sequence is 10 characters drawn from `A–Z`.
 - The player types the sequence in order; lowercase input is accepted.
 - A correct key pulls that slot's bullet feed up into the magazine and fills the slot green.
 - A wrong key fills the slot red and marks the whole magazine broken.

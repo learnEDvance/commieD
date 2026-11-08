@@ -1,9 +1,10 @@
 :root {
   color-scheme: dark;
   font-family: system-ui, sans-serif;
-  --slot-width: 46px;
-  --slot-gap: 8px;
-  --slots: 5;
+  --slot-width: clamp(22px, 4.4vw, 46px);
+  --slot-gap: clamp(2px, 0.7vw, 8px);
+  --slots: 10;
+  --load-height: 88px;
 }
 
 * {
@@ -23,22 +24,24 @@ body {
 }
 
 .factory {
-  display: grid;
-  align-content: start;
-  justify-items: center;
-  gap: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100vh;
   min-height: 100vh;
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 22px 24px 36px;
+  margin: 0;
+  padding: 16px 16px 0;
 }
 
 /* ---------- Stats ---------- */
 
 .stats {
   display: flex;
+  flex: 0 0 auto;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 8px 26px;
+  margin-bottom: 16px;
   font-size: 12px;
   letter-spacing: 0.08em;
   color: #9aa39a;
@@ -53,7 +56,10 @@ body {
 
 .presenter {
   display: grid;
+  flex: 0 0 auto;
   justify-items: center;
+  width: 100%;
+  margin-bottom: 12px;
   gap: 8px;
 }
 
@@ -107,10 +113,12 @@ body {
 
 .load-area {
   position: relative;
+  z-index: 2;
   display: grid;
+  flex: 0 0 auto;
   place-items: center;
   width: 100%;
-  height: 98px;
+  height: var(--load-height);
   overflow: hidden;
 }
 
@@ -128,6 +136,7 @@ body {
   position: absolute;
   top: 50%;
   left: 50%;
+  z-index: 3;
   display: grid;
   justify-items: center;
   gap: 7px;
@@ -182,11 +191,16 @@ body {
 /* ---------- Bullet feeds ---------- */
 
 .feeds {
+  position: relative;
+  z-index: 1;
   display: grid;
+  flex: 1 1 0;
   grid-template-columns: repeat(var(--slots), var(--slot-width));
   gap: var(--slot-gap);
   justify-content: center;
-  height: 132px;
+  align-items: stretch;
+  width: 100%;
+  min-height: 0;
 }
 
 .feed {
@@ -194,12 +208,13 @@ body {
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  height: 100%;
 }
 
 .feed__line {
   position: absolute;
-  top: 0;
-  bottom: 14px;
+  top: calc(var(--load-height) / -2);
+  bottom: -80px;
   width: 1px;
   background: #2a2f2a;
 }
@@ -207,6 +222,7 @@ body {
 .feed__bullet {
   width: 34px;
   height: 16px;
+  margin-bottom: 12px;
   border: 1px solid #3a403a;
   background: #1a1f1a;
 }
@@ -217,15 +233,6 @@ body {
 
 .feed.is-used .feed__line {
   opacity: 0.25;
-}
-
-.hint {
-  margin: 0;
-  max-width: 520px;
-  text-align: center;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #9aa39a;
 }
 
 /* ---------- Flying bullet ---------- */
