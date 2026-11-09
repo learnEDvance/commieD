@@ -511,6 +511,34 @@ button {
   color: var(--gold);
 }
 
+/* While the bottler drains a pot, its liquid visibly falls and bubbles. */
+
+.pot.is-bottling .pot__body {
+  border-color: #9c7b1e;
+  box-shadow:
+    0 0 0 1px rgba(242, 201, 76, 0.18),
+    0 0 12px rgba(242, 201, 76, 0.18),
+    inset 0 2px 4px rgba(0, 0, 0, 0.55);
+}
+
+.pot.is-bottling .pot__liquid {
+  position: relative;
+  overflow: hidden;
+  animation: bottling-glow 1.2s ease-in-out infinite;
+}
+
+.pot.is-bottling .pot__liquid::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 24% 100%, rgba(255, 255, 255, 0.6) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 68% 100%, rgba(255, 255, 255, 0.42) 0 1px, transparent 1.6px);
+  background-repeat: repeat;
+  background-size: 9px 11px, 13px 9px;
+  animation: bottling-bubbles 0.9s linear infinite;
+}
+
 .pot__meter {
   position: absolute;
   right: 1px;
@@ -1090,6 +1118,21 @@ body.is-dragging .station.is-valid-target .station__body {
 @keyframes pot-urgent {
   50% {
     filter: brightness(1.35);
+  }
+}
+
+@keyframes bottling-glow {
+  50% {
+    filter: brightness(1.16);
+  }
+}
+
+@keyframes bottling-bubbles {
+  from {
+    background-position: 0 100%, 5px 100%;
+  }
+  to {
+    background-position: 2px -60%, -3px -40%;
   }
 }
 

@@ -73,7 +73,7 @@ Tick only verified work. One small step at a time.
 - [x] Bottom-left info panel: title, stats, full process plan, live hint
 - [x] Pointer drag-and-drop between stations with dynamic route arrows
 - [x] Pot work progress, ready-window timers, process badges, wrong-drop toasts
-- [x] Bottling FX: vials stream offscreen right, emptied pots fall offscreen bottom
+- [x] Bottling FX: ten-second drain, vials stream offscreen right, emptied pots fall offscreen bottom
 - [x] Placeholder pot, machine, bottle, and vial art with centralized asset paths
 - [x] Browser smoke test: layout, intake, drag, wrong station, full route, bottling, spoilage
 - [ ] Tune process durations and ready windows through playtesting

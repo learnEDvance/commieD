@@ -116,13 +116,14 @@ export const DEFAULT_CONFIG = Object.freeze({
   bottlerCapacity: 4,
   vialsPerPot: 20,
   secondsPerVial: 1,
-  bottlingMs: 900,
+  bottlingMs: 10000,
 });
 
 export const POT_STATUS = Object.freeze({
   IDLE: 'idle',
   WORKING: 'working',
   READY: 'ready',
+  QUEUED: 'queued',
   BOTTLING: 'bottling',
   DONE: 'done',
   SPOILED: 'spoiled',
@@ -336,6 +337,7 @@ export class DashSupplementFactory {
     }
     if (
       pot.status === POT_STATUS.WORKING ||
+      pot.status === POT_STATUS.QUEUED ||
       pot.status === POT_STATUS.BOTTLING
     ) {
       return this.#rejected('pot-busy');
@@ -441,27 +443,48 @@ export class DashSupplementFactory {
         if (pot.windowMsLeft <= 0) {
           this.#spoil(pot, events, Math.max(0, pot.stepIndex - 1));
         }
-      } else if (pot.status === POT_STATUS.BOTTLING) {
-        pot.progressMs += deltaMs;
-
-        if (pot.progressMs >= this.config.bottlingMs) {
-          const vials = this.config.vialsPerPot;
-          pot.progressMs = this.config.bottlingMs;
-          pot.status = POT_STATUS.DONE;
-          pot.bottled = true;
-          pot.location = 'exited';
-          this._vialsProduced += vials;
-          this._potsBottled += 1;
-          events.push({
-            type: 'pot-bottled',
-            potId: pot.id,
-            vials,
-            seconds: vials * this.config.secondsPerVial,
-            vialsProduced: this._vialsProduced,
-            secondsProduced: this.secondsProduced,
-          });
-        }
       }
+    }
+
+    // The bottler empties one pot at a time. Anything else in the bottler
+    // waits as a queue, so a large delta can finish several pots in order.
+    let bottlingRemaining = deltaMs;
+
+    while (bottlingRemaining > 0) {
+      const active = this._pots.find(
+        (candidate) =>
+          candidate.location === 'bottler' &&
+          candidate.status === POT_STATUS.BOTTLING,
+      );
+
+      if (!active) {
+        break;
+      }
+
+      const needed = this.config.bottlingMs - active.progressMs;
+
+      if (bottlingRemaining < needed) {
+        active.progressMs += bottlingRemaining;
+        break;
+      }
+
+      bottlingRemaining -= needed;
+      active.progressMs = this.config.bottlingMs;
+      active.status = POT_STATUS.DONE;
+      active.bottled = true;
+      active.location = 'exited';
+      this._vialsProduced += this.config.vialsPerPot;
+      this._potsBottled += 1;
+      events.push({
+        type: 'pot-bottled',
+        potId: active.id,
+        vials: this.config.vialsPerPot,
+        seconds: this.config.vialsPerPot * this.config.secondsPerVial,
+        vialsProduced: this._vialsProduced,
+        secondsProduced: this.secondsProduced,
+      });
+
+      this.#promoteQueuedPot(events);
     }
 
     return this.#tick(deltaMs, events);
@@ -495,8 +518,14 @@ export class DashSupplementFactory {
     }
 
     const from = pot.location;
+    const bottlerBusy = this._pots.some(
+      (candidate) =>
+        candidate.location === 'bottler' &&
+        candidate.status === POT_STATUS.BOTTLING,
+    );
+
     pot.location = 'bottler';
-    pot.status = POT_STATUS.BOTTLING;
+    pot.status = bottlerBusy ? POT_STATUS.QUEUED : POT_STATUS.BOTTLING;
     pot.progressMs = 0;
     pot.windowMsLeft = 0;
 
@@ -509,6 +538,28 @@ export class DashSupplementFactory {
       stepIndex: pot.stepIndex,
       step: null,
     };
+  }
+
+  /** Start the next waiting pot in the bottler, if any. */
+  #promoteQueuedPot(events) {
+    const next = this._pots.find(
+      (candidate) =>
+        candidate.location === 'bottler' &&
+        candidate.status === POT_STATUS.QUEUED,
+    );
+
+    if (!next) {
+      return null;
+    }
+
+    next.status = POT_STATUS.BOTTLING;
+    next.progressMs = 0;
+    events.push({
+      type: 'bottling-started',
+      potId: next.id,
+    });
+
+    return next;
   }
 
   #spoil(pot, events, stepIndex = pot.stepIndex) {

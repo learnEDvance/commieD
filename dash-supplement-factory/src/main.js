@@ -198,7 +198,9 @@ function potFill(pot) {
     return 0;
   }
   if (pot.location === 'bottler') {
-    return 100;
+    // The pot visibly drains as the bottler pulls its contents out.
+    const remaining = 1 - pot.progressMs / core.config.bottlingMs;
+    return Math.max(0, Math.min(1, remaining)) * 100;
   }
 
   const total = processByIndex.length;
@@ -252,7 +254,13 @@ function potTitle(pot) {
     return `Pot #${pot.id} — empty, drag it to the mill`;
   }
   if (pot.location === 'bottler') {
-    return `Pot #${pot.id} — bottling`;
+    const secondsLeft = Math.max(
+      0,
+      (core.config.bottlingMs - pot.progressMs) / 1000,
+    );
+    return `Pot #${pot.id} — emptying into vials (${secondsLeft.toFixed(
+      1,
+    )}s left)`;
   }
   if (pot.status === POT_STATUS.WORKING) {
     const process = processByIndex[pot.stepIndex];
@@ -490,9 +498,13 @@ function renderHint() {
     return;
   }
 
-  if (active.some((pot) => pot.status === POT_STATUS.BOTTLING)) {
-    ui.hint.textContent =
-      'The bottler is filling vials. Emptied pots drop out below.';
+  const bottling = active.find(
+    (pot) => pot.status === POT_STATUS.BOTTLING,
+  );
+  if (bottling) {
+    ui.hint.textContent = `Pot #${bottling.id} is emptying into vials — ${
+      core.config.bottlingMs / 1000
+    } seconds per pot. Emptied pots drop out below.`;
     return;
   }
 

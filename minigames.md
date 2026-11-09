@@ -163,7 +163,7 @@ Rules as implemented:
 - Stations process automatically; a working pot cannot leave.
 - A finished process opens a ready window. If the window empties, the pot spoils, leaves the station, and frees its slot.
 - Process 12 must finish before the bottler accepts the pot.
-- The bottler holds four pots and bottles one pot every `900 ms`.
+- The bottler holds four pots and empties each pot over `10000 ms`; the pot's liquid drains visibly while it bottles.
 - One pot produces 20 vials; one vial is one second of dash.
 - Vials are only awarded when bottling finishes.
 - The core is deterministic and replayable; the browser owns the clock and reports deltas.
@@ -183,7 +183,7 @@ Browser shell as built:
 - Gold arrows show the next hop for ready pots; dashed arrows show the hop still processing.
 - The bottom-left panel shows title, IN PLAY / VIALS / DASH / SPOILED, all twelve numbered processes, and a live hint.
 - Pots show a process badge, fill level, work progress, and a ready-window timer.
-- Bottling streams vial sprites off the right edge; emptied pots fall off the bottom edge.
+- Bottling takes ten seconds per pot and drains its liquid visibly, then streams vial sprites off the right edge; emptied pots fall off the bottom edge.
 - Wrong drops raise a toast; spoiled pots are removed and counted.
 - The line never ends or batches; play continues as long as the player takes pots.
 

@@ -67,7 +67,7 @@ The vat is used three times; the still, filter, bureau, and press twice; the mil
 - When work finishes the pot becomes ready and a window timer starts.
 - If the window expires, the pot spoils, leaves the station, and frees its slot.
 - After process 12, the pot can enter the bottler. Earlier drops are rejected.
-- The bottler holds four pots and bottles each for `bottlingMs`.
+- The bottler holds four pots and empties each pot over ten seconds (`bottlingMs`). The pot's liquid level visibly drains while it bottles.
 - Each pot yields 20 vials; each vial is 1 second of dash.
 - Vials are awarded when bottling finishes. The emptied pot leaves the floor.
 - The core is deterministic and replayable from the same action sequence. The browser passes frame deltas to `advance()`.
@@ -91,7 +91,7 @@ factory.dropPot(1, 'vat');            // starts process 2
 factory.advance(1400);
 // ...continue through the plan...
 factory.dropPot(1, 'bottler');        // only after process 12
-factory.advance(900);                 // tick: returns pot-bottled
+factory.advance(10000);               // tick: returns pot-bottled
 factory.takeVials();                  // 20, then resets
 factory.takeSeconds();                // 20, then resets
 ```
@@ -112,7 +112,7 @@ Useful getters: `processes`, `stations`, `pots`, `activePots`, `intakePots`, `oc
 | `bottlerCapacity` | `4` | Pots in the bottler |
 | `vialsPerPot` | `20` | Vials produced by one pot |
 | `secondsPerVial` | `1` | Dash duration of one vial |
-| `bottlingMs` | `900` | Bottling time per pot |
+| `bottlingMs` | `10000` | Bottling time per pot (pot visibly drains) |
 
 ## Test
 

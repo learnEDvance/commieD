@@ -5,10 +5,11 @@ export const DEFAULT_CONFIG = Object.freeze({
   // Average time per key for each whole-number multiplier. Slower than the
   // last entry earns the default 1x.
   speedSteps: Object.freeze([
-    { maxAverageMs: 400, multiplier: 5 },
-    { maxAverageMs: 600, multiplier: 4 },
-    { maxAverageMs: 800, multiplier: 3 },
-    { maxAverageMs: 1100, multiplier: 2 },
+    { maxAverageMs: 300, multiplier: 10 },
+    { maxAverageMs: 500, multiplier: 5 },
+    { maxAverageMs: 700, multiplier: 4 },
+    { maxAverageMs: 900, multiplier: 3 },
+    { maxAverageMs: 1000, multiplier: 2 },
   ]),
 });
 

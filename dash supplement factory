@@ -1,27 +1,5 @@
-process:
-start
-    |
-    V
-take a pot(max 5 in a batch)
-    |
-    V
-add vodka
-    |
-    v
-hold to stir
-    |
-    v
-add national spirit
-    |
-    v
-Heat by holding mouse
-    |
-    v
-take pot from main station to bottling station
-    |
-    v
-click on machine to bottle the potions. 1pot=20secs of speed. 1 bottle=1second
+this will be a maagement game. you can take as many pots as you want. these pots have to be dragged into stations. which do work on them. a station can have 4 pots at once(a 2x2 grid with a protrusion showing the machine it is). we will have 10-15 communist themed processes(name the porcesses as 1->2-3 and soo on). there can be a limited number of stations but processes can include the stations more than once. now you the player will have to drag the pot where it needs to go. make sure to move it in time. make sure the sequence is correct then drop em off in the bottling section where they are bottled into vials(that go offscreen to the right) and the emptied pot now goes offscreen to the bottom.
+empty pots will be collected from the top left. the processes will be taken station to station with the bottling station at the bottom right.use arrows between the stations for the user to know from where to where the pots are supposed to go.
 
-
-
-in case of any mistake in the order. the whole batch is wasted and must be destroyed.
+prompt:
+the current vials line doesnt look like an assembly belt. fixed that. also, the pots just fading out doesnt look nice. make a nice assembly belt for it to go down in. dont fade it. the vials just whizzing past also doesnt look great. fix that by taking it along the line. in sequence as the pots get empty. a pot can be emptied sequentially. not parallel like the other stations.

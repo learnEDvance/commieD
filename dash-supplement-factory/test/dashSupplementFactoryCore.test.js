@@ -276,7 +276,12 @@ test('the full route reuses stations and ends at the bottler', () => {
   assert.equal(dropped.type, 'pot-dropped');
   assert.equal(factory.pots[0].status, POT_STATUS.BOTTLING);
 
-  const tick = factory.advance(900);
+  const early = factory.advance(9999);
+  assert.equal(early.events.length, 0);
+  assert.equal(factory.pots[0].status, POT_STATUS.BOTTLING);
+  assert.equal(factory.vialsProduced, 0);
+
+  const tick = factory.advance(1);
   assert.equal(tick.events.length, 1);
   assert.equal(tick.events[0].type, 'pot-bottled');
   assert.equal(tick.events[0].vials, 20);
@@ -318,14 +323,82 @@ test('the bottler holds four pots and rejects the fifth', () => {
   assert.equal(fifth.reason, 'bottler-full');
   assert.equal(factory.occupancy.bottler, 4);
 
-  const tick = factory.advance(100);
+  const first = factory.advance(100);
   assert.equal(
-    tick.events.filter((event) => event.type === 'pot-bottled').length,
-    4,
+    first.events.filter((event) => event.type === 'pot-bottled').length,
+    1,
+  );
+
+  const rest = factory.advance(300);
+  assert.equal(
+    rest.events.filter((event) => event.type === 'pot-bottled').length,
+    3,
   );
   assert.equal(factory.vialsProduced, 80);
   assert.equal(factory.activePots.length, 1);
   assert.equal(drop(factory, 5, 'bottler').type, 'pot-dropped');
+});
+
+test('the bottler empties pots one at a time', () => {
+  const factory = makeFactory({ ...FAST_CONFIG, stationCapacity: 5 });
+  takePots(factory, 2);
+
+  for (const id of [1, 2]) {
+    assert.equal(drop(factory, id, 'mill').type, 'pot-dropped');
+  }
+  factory.advance(FAST_PROCESS.durationMs);
+
+  assert.equal(drop(factory, 1, 'bottler').type, 'pot-dropped');
+  assert.equal(drop(factory, 2, 'bottler').type, 'pot-dropped');
+  assert.equal(factory.pots[0].status, POT_STATUS.BOTTLING);
+  assert.equal(factory.pots[1].status, POT_STATUS.QUEUED);
+
+  const half = factory.advance(60);
+  assert.equal(half.events.length, 0);
+  assert.equal(factory.pots[0].progressMs, 60);
+  assert.equal(factory.pots[1].progressMs, 0);
+  assert.equal(factory.vialsProduced, 0);
+
+  const first = factory.advance(40);
+  assert.deepEqual(
+    first.events.map((event) => [event.type, event.potId]),
+    [
+      ['pot-bottled', 1],
+      ['bottling-started', 2],
+    ],
+  );
+  assert.equal(factory.pots[0].location, 'exited');
+  assert.equal(factory.pots[1].status, POT_STATUS.BOTTLING);
+  assert.equal(factory.pots[1].progressMs, 0);
+  assert.equal(factory.vialsProduced, 20);
+
+  factory.advance(100);
+  assert.equal(factory.potsBottled, 2);
+  assert.equal(factory.vialsProduced, 40);
+});
+
+test('a large tick empties queued pots in order', () => {
+  const factory = makeFactory({ ...FAST_CONFIG, stationCapacity: 5 });
+  takePots(factory, 2);
+
+  for (const id of [1, 2]) {
+    assert.equal(drop(factory, id, 'mill').type, 'pot-dropped');
+  }
+  factory.advance(FAST_PROCESS.durationMs);
+  drop(factory, 1, 'bottler');
+  drop(factory, 2, 'bottler');
+
+  const tick = factory.advance(200);
+  assert.deepEqual(
+    tick.events.map((event) => [event.type, event.potId]),
+    [
+      ['pot-bottled', 1],
+      ['bottling-started', 2],
+      ['pot-bottled', 2],
+    ],
+  );
+  assert.equal(factory.vialsProduced, 40);
+  assert.equal(factory.potsBottled, 2);
 });
 
 test('one tick can complete several pots deterministically', () => {
@@ -350,12 +423,22 @@ test('one tick can complete several pots deterministically', () => {
     drop(factory, id, 'bottler');
   }
 
-  const bottled = factory.advance(100);
+  const first = factory.advance(100);
+  assert.deepEqual(
+    first.events.map((event) => [event.type, event.potId]),
+    [
+      ['pot-bottled', 1],
+      ['bottling-started', 2],
+    ],
+  );
+  assert.equal(factory.vialsProduced, 20);
+
+  const bottled = factory.advance(200);
   assert.deepEqual(
     bottled.events.map((event) => [event.type, event.potId]),
     [
-      ['pot-bottled', 1],
       ['pot-bottled', 2],
+      ['bottling-started', 3],
       ['pot-bottled', 3],
     ],
   );
