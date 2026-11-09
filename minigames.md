@@ -163,9 +163,9 @@ Rules as implemented:
 - Stations process automatically; a working pot cannot leave.
 - A finished process opens a ready window. If the window empties, the pot spoils, leaves the station, and frees its slot.
 - Process 12 must finish before the bottler accepts the pot.
-- The bottler holds four pots and empties each pot over `10000 ms`; the pot's liquid drains visibly while it bottles.
+- The bottler holds four pots and empties them one at a time over `10000 ms` each; waiting pots queue, and only the active pot's liquid drains visibly.
 - One pot produces 20 vials; one vial is one second of dash.
-- Vials are only awarded when bottling finishes.
+- Vials are only awarded when bottling finishes. Vials appear one at a time during the drain and ride the upper outfeed belt; the emptied pot rides the lower belt away without fading.
 - The core is deterministic and replayable; the browser owns the clock and reports deltas.
 
 Core interface:
@@ -178,7 +178,7 @@ Core interface:
 
 Browser shell as built:
 
-- Separate station cards, no belt. Each card has a machine protrusion and four slots.
+- Separate station cards with no belt between stations. Each card has a machine protrusion and four slots. The bottler has two short outfeed belts: vials above, empties below.
 - Pointer drag-and-drop from the intake or a ready station to the next station or bottler.
 - Gold arrows show the next hop for ready pots; dashed arrows show the hop still processing.
 - The bottom-left panel shows title, IN PLAY / VIALS / DASH / SPOILED, all twelve numbered processes, and a live hint.

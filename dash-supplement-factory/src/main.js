@@ -14,7 +14,7 @@ const STATION_POSITIONS = {
   press: { x: 38, y: 48 },
   bureau: { x: 56, y: 47 },
   filter: { x: 74, y: 48 },
-  bottler: { x: 82, y: 84 },
+  bottler: { x: 76, y: 84 },
 };
 const FLOW_INDEX = {
   intake: 0,
@@ -146,8 +146,18 @@ function buildStations() {
         <span>VIALS →</span>
       </div>
     </div>
-    <div class="bottler__chute" aria-hidden="true">VIALS</div>
-    <div class="bottler__drop" aria-hidden="true">EMPTIES</div>
+    <div class="outfeed outfeed--vials" aria-hidden="true">
+      <span class="outfeed__label">VIALS</span>
+      <div class="belt">
+        <span class="belt__track" data-vial-track></span>
+      </div>
+    </div>
+    <div class="outfeed outfeed--empties" aria-hidden="true">
+      <span class="outfeed__label">EMPTIES</span>
+      <div class="belt belt--empties">
+        <span class="belt__track" data-empties-track></span>
+      </div>
+    </div>
   `;
 
   ui.stations.append(bottler);
@@ -157,6 +167,8 @@ function buildStations() {
     count: bottler.querySelector('[data-count]'),
     capacity: core.bottlerCapacity,
     label: 'BOTTLER',
+    vialTrack: bottler.querySelector('[data-vial-track]'),
+    emptiesTrack: bottler.querySelector('[data-empties-track]'),
   });
 }
 
@@ -239,7 +251,7 @@ function potBadge(pot) {
     return '○';
   }
   if (pot.location === 'bottler') {
-    return 'BTL';
+    return pot.status === POT_STATUS.QUEUED ? 'WAIT' : 'BTL';
   }
   if (pot.status === POT_STATUS.WORKING) {
     return String(processByIndex[pot.stepIndex]?.order ?? '·');
@@ -254,6 +266,9 @@ function potTitle(pot) {
     return `Pot #${pot.id} — empty, drag it to the mill`;
   }
   if (pot.location === 'bottler') {
+    if (pot.status === POT_STATUS.QUEUED) {
+      return `Pot #${pot.id} — waiting in the bottler queue`;
+    }
     const secondsLeft = Math.max(
       0,
       (core.config.bottlingMs - pot.progressMs) / 1000,
@@ -344,6 +359,9 @@ function createPotElement(pot) {
   }
   if (pot.status === POT_STATUS.BOTTLING) {
     el.classList.add('is-bottling');
+  }
+  if (pot.status === POT_STATUS.QUEUED) {
+    el.classList.add('is-queued');
   }
   if (isDraggable(pot)) {
     el.classList.add('is-draggable');
@@ -502,9 +520,10 @@ function renderHint() {
     (pot) => pot.status === POT_STATUS.BOTTLING,
   );
   if (bottling) {
-    ui.hint.textContent = `Pot #${bottling.id} is emptying into vials — ${
-      core.config.bottlingMs / 1000
-    } seconds per pot. Emptied pots drop out below.`;
+    const waiting = active.filter(
+      (pot) => pot.status === POT_STATUS.QUEUED,
+    ).length;
+    ui.hint.textContent = `Pot #${bottling.id} is emptying onto the vial belt — one pot at a time, ${core.config.bottlingMs / 1000} seconds each.${waiting > 0 ? ` ${waiting} pot${waiting === 1 ? '' : 's'} waiting.` : ''}`;
     return;
   }
 
@@ -927,7 +946,25 @@ function pulseStation(id) {
   window.setTimeout(() => view.card.classList.remove('is-pumping'), 380);
 }
 
-function capturePotFx(potId, kind) {
+function clonePotVisual(potEl) {
+  const clone = potEl.cloneNode(true);
+  clone.classList.remove(
+    'is-ready',
+    'is-working',
+    'is-bottling',
+    'is-queued',
+    'is-urgent',
+    'is-warning',
+    'is-draggable',
+    'is-dragging-source',
+  );
+  clone.removeAttribute('data-pot-id');
+  clone.tabIndex = -1;
+  clone.disabled = true;
+  return clone;
+}
+
+function captureSpoiledFx(potId) {
   if (reduceMotion) {
     return;
   }
@@ -940,9 +977,8 @@ function capturePotFx(potId, kind) {
   }
 
   const rect = el.getBoundingClientRect();
-  const clone = el.cloneNode(true);
-  clone.classList.remove('is-ready', 'is-urgent', 'is-warning');
-  clone.classList.add('fx-pot', `fx-pot--${kind}`);
+  const clone = clonePotVisual(el);
+  clone.classList.add('fx-pot');
   clone.style.left = `${rect.left}px`;
   clone.style.top = `${rect.top}px`;
   clone.style.width = `${rect.width}px`;
@@ -950,18 +986,10 @@ function capturePotFx(potId, kind) {
   ui.fx.append(clone);
 
   const animation = clone.animate(
-    kind === 'bottled'
-      ? [
-          { transform: 'translate(0, 0) scale(1)', opacity: 1 },
-          {
-            transform: `translate(0, ${window.innerHeight - rect.top + 60}px) scale(0.55)`,
-            opacity: 0,
-          },
-        ]
-      : [
-          { transform: 'translate(0, 0) scale(1) rotate(0deg)', opacity: 1 },
-          { transform: 'translate(0, 100px) scale(0.5) rotate(26deg)', opacity: 0 },
-        ],
+    [
+      { transform: 'translate(0, 0) scale(1) rotate(0deg)', opacity: 1 },
+      { transform: 'translate(0, 100px) scale(0.5) rotate(26deg)', opacity: 0 },
+    ],
     {
       duration: 680,
       easing: 'ease-in',
@@ -972,49 +1000,119 @@ function capturePotFx(potId, kind) {
   animation.finished.then(() => clone.remove()).catch(() => clone.remove());
 }
 
-function spawnVials(count) {
+/* Emptied pots ride the lower conveyor away; they never fade in place. */
+function sendPotDownEmpties(potId) {
   if (reduceMotion) {
     return;
   }
 
-  const chute = stationViews.get('bottler')?.card.querySelector('.bottler__chute');
-  if (!chute) {
+  const track = stationViews.get('bottler')?.emptiesTrack;
+  const el = document.querySelector(
+    `.pot[data-pot-id="${potId}"]:not(.drag-ghost)`,
+  );
+
+  if (!track || !el) {
     return;
   }
 
-  const rect = chute.getBoundingClientRect();
-  const startX = rect.right - 10;
-  const startY = rect.top + rect.height / 2 - 13;
-  const amount = Math.min(10, count);
+  const clone = clonePotVisual(el);
+  clone.classList.add('is-empty', 'belt-pot');
 
-  for (let index = 0; index < amount; index += 1) {
-    const vial = document.createElement('img');
-    vial.src = ASSETS.vial;
-    vial.alt = '';
-    vial.className = 'fx-vial';
-    vial.style.left = `${startX}px`;
-    vial.style.top = `${startY}px`;
-    ui.fx.append(vial);
-
-    const drift = (Math.random() - 0.5) * 70;
-    const dx = window.innerWidth - startX + 40;
-    const dy = drift;
-
-    const animation = vial.animate(
-      [
-        { transform: 'translate(0, 0) scale(1)', opacity: 1 },
-        { transform: `translate(${dx}px, ${dy}px) scale(0.85)`, opacity: 0 },
-      ],
-      {
-        duration: 620 + Math.random() * 260,
-        delay: index * 42,
-        easing: 'ease-in',
-        fill: 'backwards',
-      },
-    );
-
-    animation.finished.then(() => vial.remove()).catch(() => vial.remove());
+  const badge = clone.querySelector('.pot__badge');
+  if (badge) {
+    badge.textContent = '○';
   }
+  clone.style.setProperty('--fill', '0%');
+  clone.style.setProperty('--liquid', 'transparent');
+
+  track.append(clone);
+
+  const travel = track.clientWidth + 80;
+  const duration = Math.max(900, (travel / 95) * 1000);
+  const animation = clone.animate(
+    [
+      { transform: 'translate(-12px, -68px) rotate(-9deg)' },
+      { transform: 'translate(0, 0) rotate(0deg)', offset: 0.1 },
+      { transform: `translate(${travel}px, 0) rotate(0deg)` },
+    ],
+    {
+      duration,
+      easing: 'linear',
+      fill: 'forwards',
+    },
+  );
+
+  animation.finished.then(() => clone.remove()).catch(() => clone.remove());
+}
+
+/* Vials are released one at a time as the active pot drains. */
+function spawnVial() {
+  if (reduceMotion) {
+    return;
+  }
+
+  const track = stationViews.get('bottler')?.vialTrack;
+  if (!track) {
+    return;
+  }
+
+  const vial = document.createElement('img');
+  vial.src = ASSETS.vial;
+  vial.alt = '';
+  vial.className = 'belt-vial';
+  track.append(vial);
+
+  const travel = track.clientWidth + 40;
+  const duration = Math.max(1100, (travel / 110) * 1000);
+  const animation = vial.animate(
+    [
+      { transform: 'translate(-16px, 0)' },
+      { transform: `translate(${travel}px, 0)` },
+    ],
+    {
+      duration,
+      easing: 'linear',
+      fill: 'forwards',
+    },
+  );
+
+  animation.finished.then(() => vial.remove()).catch(() => vial.remove());
+}
+
+const vialEmitted = new Map();
+
+function vialQuota(progressMs) {
+  const perVial = core.config.bottlingMs / core.config.vialsPerPot;
+  return Math.max(
+    0,
+    Math.min(
+      core.config.vialsPerPot,
+      Math.floor(progressMs / perVial + 1e-6),
+    ),
+  );
+}
+
+function updateBottlingFlow() {
+  const active = core.pots.find(
+    (pot) =>
+      pot.location === 'bottler' && pot.status === POT_STATUS.BOTTLING,
+  );
+
+  if (!active) {
+    return;
+  }
+
+  const emitted = vialQuota(active.progressMs);
+  const previous = vialEmitted.get(active.id) ?? 0;
+
+  if (emitted <= previous) {
+    return;
+  }
+
+  for (let index = previous; index < emitted; index += 1) {
+    spawnVial();
+  }
+  vialEmitted.set(active.id, emitted);
 }
 
 function handleEvents(events) {
@@ -1024,15 +1122,21 @@ function handleEvents(events) {
         pulseStation(event.stationId);
         break;
       case 'pot-spoiled':
-        capturePotFx(event.potId, 'spoiled');
+        captureSpoiledFx(event.potId);
         toast(
           `Pot #${event.potId} spoiled at ${stationLabel(event.stationId)} — the timer ran out.`,
         );
         break;
-      case 'pot-bottled':
-        capturePotFx(event.potId, 'bottled');
-        spawnVials(event.vials);
+      case 'pot-bottled': {
+        const already = vialEmitted.get(event.potId) ?? 0;
+        const remaining = Math.max(0, event.vials - already);
+        for (let index = 0; index < remaining; index += 1) {
+          spawnVial();
+        }
+        vialEmitted.delete(event.potId);
+        sendPotDownEmpties(event.potId);
         break;
+      }
       default:
         break;
     }
@@ -1076,6 +1180,11 @@ function frame(now) {
 
     if (result.events.length > 0) {
       handleEvents(result.events);
+    }
+
+    updateBottlingFlow();
+
+    if (result.events.length > 0) {
       render();
     } else {
       updateLiveUi();

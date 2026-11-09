@@ -74,9 +74,11 @@ Tick only verified work. One small step at a time.
 - [x] Bottom-left info panel: title, stats, full process plan, live hint
 - [x] Pointer drag-and-drop between stations with dynamic route arrows
 - [x] Pot work progress, ready-window timers, process badges, wrong-drop toasts
-- [x] Bottling FX: ten-second drain, vials stream offscreen right, emptied pots fall offscreen bottom
+- [x] Bottler empties one pot at a time; queued pots show `WAIT` and stay full
+- [x] Upper outfeed belt releases vials one at a time as the active pot drains
+- [x] Lower outfeed belt carries the emptied pot away without fading
 - [x] Placeholder pot, machine, bottle, and vial art with centralized asset paths
-- [x] Browser smoke test: layout, intake, drag, wrong station, full route, bottling, spoilage
+- [x] Browser smoke test: layout, intake, drag, wrong station, full route, sequential bottling, vial belt, empty-pot belt, spoilage
 - [ ] Tune process durations and ready windows through playtesting
 - [ ] Confirm wrong-station drops should stay free
 - [ ] Integrate `takeVials()` / `takeSeconds()` with the host speed resource

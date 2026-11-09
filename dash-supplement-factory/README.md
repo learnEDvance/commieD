@@ -27,7 +27,7 @@ Then open <http://localhost:8002/>.
 | Move a pot | Drag it from the intake or a station and drop it on a station |
 | Start a process | Drop a ready pot on the station for its current numbered process |
 | Finish a pot | After process 12, drag it into the bottom-right bottler |
-| Bank output | Vials leave the bottler automatically; `DASH` tracks seconds |
+| Bank output | Vials ride the bottler's outfeed belts automatically; `DASH` tracks seconds |
 
 Stations process pots automatically. A pot turns **ready** when its process finishes, then a timer starts. Drag it to the next station before the timer empties or it spoils and is lost.
 
@@ -35,7 +35,7 @@ Stations process pots automatically. A pot turns **ready** when its process fini
 
 - **Intake** — top left, unlimited empty pots.
 - **Six stations** — grain mill, mash vat, agitator press, spirit still, purity filter, and plan bureau. Every station has a 2×2 grid of four slots plus a machine protrusion.
-- **Bottler** — bottom right. Four slots. Vials stream off the right edge; emptied pots fall off the bottom edge.
+- **Bottler** — bottom right. Four slots, emptied one pot at a time. Vials ride the upper outfeed belt as the pot drains; the emptied pot rides the lower belt away.
 - **Info panel** — bottom left. Title, live stats, all twelve numbered processes, and the current hint.
 - **Arrows** — drawn from each pot's station to its next required station, labelled with the process number. Bright gold arrows are ready to follow; dashed arrows are still processing.
 
@@ -67,9 +67,10 @@ The vat is used three times; the still, filter, bureau, and press twice; the mil
 - When work finishes the pot becomes ready and a window timer starts.
 - If the window expires, the pot spoils, leaves the station, and frees its slot.
 - After process 12, the pot can enter the bottler. Earlier drops are rejected.
-- The bottler holds four pots and empties each pot over ten seconds (`bottlingMs`). The pot's liquid level visibly drains while it bottles.
+- The bottler holds four pots and empties them one at a time over ten seconds each (`bottlingMs`). Waiting pots show `WAIT`; only the active pot drains.
+- The pot's liquid level visibly drains while it bottles. Vials appear one at a time and ride the upper belt; the emptied pot drops onto the lower belt and is carried away without fading.
 - Each pot yields 20 vials; each vial is 1 second of dash.
-- Vials are awarded when bottling finishes. The emptied pot leaves the floor.
+- Vials are awarded when bottling finishes. The emptied pot leaves the floor on the lower belt.
 - The core is deterministic and replayable from the same action sequence. The browser passes frame deltas to `advance()`.
 
 ## Core API
@@ -100,7 +101,7 @@ Useful getters: `processes`, `stations`, `pots`, `activePots`, `intakePots`, `oc
 
 `dropPot()` returns `pot-dropped` or `rejected` with a reason such as `wrong-station`, `station-full`, `bottler-full`, `pot-busy`, `processes-remaining`, or `pot-gone`.
 
-`advance(deltaMs)` returns `{ type: 'tick', events, elapsedMs, ... }`. Events can include `process-complete`, `pot-spoiled`, and `pot-bottled` in the same tick.
+`advance(deltaMs)` returns `{ type: 'tick', events, elapsedMs, ... }`. Events can include `process-complete`, `pot-spoiled`, `pot-bottled`, and `bottling-started` in the same tick.
 
 ## Configuration
 
