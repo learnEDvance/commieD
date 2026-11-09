@@ -62,7 +62,18 @@ Tick only verified work. One small step at a time.
 
 ## Dash Supplement Factory
 
-- [ ] Confirm bottling math (1 pot = 20 × 1-second bottles)
-- [ ] Define stirring/heating hold durations
-- [ ] Implement exact-order batch rules and failure reset
+- [x] Save the process and rules in `minigames.md`
+- [x] Confirm bottling math (1 pot = 20 bottles = 20 seconds)
+- [x] Define stir/heating/filter hold durations
+- [x] Extended recipe with beet extract and filter steps
+- [x] Pure core: collect pots, exact recipe order, holds, move, bottle, failure, destroy
+- [x] Bottles are only committed when the whole batch is bottled
+- [x] Failed batches discard pending bottles and must be destroyed
+- [x] Deterministic hold progress (`advanceHold`) with no wall-clock in the core
+- [x] Unit tests for happy path, wrong order, early release, partial bottling loss, destroy reset, output APIs
+- [x] Run instructions and core API documented in `dash-supplement-factory/README.md`
+- [ ] Tune hold durations through playtesting
 - [ ] Browser shell and dummy assets
+- [ ] Drag/take pot interactions and bottling machine UI
+- [ ] Integrate `takeBottles()` / `takeSeconds()` with the host speed resource
+- [ ] Replace placeholder art

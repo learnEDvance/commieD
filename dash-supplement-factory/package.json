@@ -1,0 +1,8 @@
+{
+  "name": "@commied/dash-supplement-factory",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

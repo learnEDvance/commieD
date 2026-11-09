@@ -117,7 +117,9 @@ Open questions:
 
 Purpose: a clicky factory minigame that produces dash seconds.
 
-Process:
+Implemented: `dash-supplement-factory/src/dashSupplementFactoryCore.js` (pure rules, no DOM or wall-clock) and `test/dashSupplementFactoryCore.test.js` (27 tests). Browser shell pending.
+
+Source process:
 
 1. Take a pot — maximum 5 pots in a batch.
 2. Add vodka.
@@ -127,16 +129,46 @@ Process:
 6. Take the pot from the main station to the bottling station.
 7. Click the machine to bottle the potions.
 
-Rules:
+Default extended recipe (the source process plus two extra factory steps):
 
-- The order must be followed exactly.
-- Any mistake wastes the **entire batch**; it must be destroyed.
-- `1 pot = 20 seconds` of speed.
-- `1 bottle = 1 second` of speed.
+1. Add vodka.
+2. Add beet extract.
+3. Hold to stir (`1800 ms`).
+4. Add national spirit.
+5. Hold to heat (`2200 ms`).
+6. Hold to filter (`1400 ms`).
+
+`BASE_RECIPE` keeps the shorter source process; `DEFAULT_RECIPE` is the extended version.
+
+Rules as implemented:
+
+- A batch holds 1–5 pots. Taking a sixth pot is rejected without failing the batch.
+- Adding the first ingredient locks the batch; no more pots can be taken.
+- The recipe must be followed exactly, in order.
+- Stirring, heating, and filtering are holds. The browser passes elapsed milliseconds to `advanceHold(deltaMs)`; the core never reads a clock.
+- Releasing a hold before it finishes wastes the batch.
+- After the recipe, every pot must be moved from the main station to the bottling station.
+- The bottling machine bottles one pot per click.
+- `1 pot = 20 bottles`; `1 bottle = 1 second` of speed. A full five-pot batch is 100 seconds.
+- Pending bottles are not committed until every pot in the batch is bottled.
+- Any order mistake wastes the **entire batch**: all pots are marked wasted, pending bottles are discarded, and no output is awarded.
+- A failed batch must be destroyed with `destroyBatch()` before another batch can start.
+- Taking a pot after a completed batch starts a new batch without discarding produced output.
+- The core is deterministic and replayable from the same action sequence.
+
+Core interface:
+
+- Mutations: `takePot()`, `startBatch()`, `addIngredient(id)`, `beginHold(stepId)`, `advanceHold(deltaMs)`, `releaseHold()`, `movePot(potId)`, `moveNextPot()`, `bottleNextPot()`, `destroyBatch()`, `newBatch()`.
+- Output: `takeBottles()`, `takeSeconds()`.
+- State: `phase`, `batchSize`, `pots`, `currentStep`, `nextAction`, `canTakePot`, `canStartBatch`, `hold`, `holdProgress`, `batchBottles`, `batchSeconds`, `bottlesProduced`, `secondsProduced`, `failureReason`, `lastBatch`, `batchesCompleted`, `batchesFailed`.
+- Action results are plain events (`pot-taken`, `hold-progress`, `bottled`, `batch-failed`, `rejected`, and so on).
 
 Open questions:
 
-- Confirm that each pot yields 20 one-second bottles.
-- Define hold durations for stirring and heating.
-- Define the bottling click rate and whether all pots in a batch bottle together.
-- Define how drag/take/bottling interactions work and how failure is shown.
+- Confirm that each pot should yield 20 one-second bottles rather than a different split.
+- Tune the stir, heat, and filter hold durations.
+- Confirm whether the bottling machine should bottle one pot per click or all pots at once.
+- Decide whether bottled pots should be draggable, click-to-move, or both.
+- Define how a wasted batch is shown and how the destroy action is confirmed.
+- Decide whether the extra beet-extract and filter steps stay in the final game.
+- Add a browser shell, placeholder station/pot art, and host speed-resource integration.
