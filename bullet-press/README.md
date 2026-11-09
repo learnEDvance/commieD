@@ -14,15 +14,15 @@ From top to bottom:
 
 1. **Sequence presenter** — the characters to type; the next one is highlighted. It sits above the magazine line.
 2. **Magazine line** — a full-width conveyor centered in the middle of the screen. The current 10-slot magazine sits on the line, with two empty magazines queued to its left and the previous magazine (if any) to its right.
-3. **Main feeder + branches** — a single horizontal bullet stream enters from the right along a feeder rail near the bottom of the screen. Ten vertical feed lines branch upward from it, one per slot, each carrying a column of bullets. Loading a slot pulls the top bullet into the magazine and advances that column; a wrong key fills it red.
+3. **Main feeder + branches** — a single horizontal bullet rail enters from the right and stops at the leftmost branch, so it only serves this station. Ten vertical feed lines branch upward from it, one per slot, each carrying a column of bullets. The rail sits above the branch layers and stays clogged while every branch is full. Loading a slot pulls its top bullet into the magazine and feeds a fresh bullet from the rail into the bottom of that branch, which indexes the rail forward by one bullet. A wrong key does the same and fills the line red.
 4. When all slots are filled, the line shifts right: the current magazine becomes the previous one, a waiting magazine slides into the center, and a fresh empty magazine enters from the left. Older previous magazines slide farther right and fade out.
 5. Magazine and sequence objects use a 5% larger scale than the base layout.
 
 ## Rules implemented
 
 - One sequence is 10 characters drawn from `A–Z`.
-- A correct key fills the next magazine slot green, pulls that branch’s top bullet into the magazine, advances the branch column, and fills the line upward.
-- A wrong key fills the next slot red, pulls the top bullet in red, advances the branch column, and marks the whole magazine broken.
+- A correct key fills the next magazine slot green, pulls that branch’s top bullet into the magazine, refills the bottom of that branch from the main feeder, indexes the feeder forward by one bullet, and fills the line upward.
+- A wrong key fills the next slot red, pulls the top bullet in red, refills that branch from the feeder, indexes the feeder, and marks the whole magazine broken.
 - A broken magazine **cannot be discarded immediately**. It stays until every slot is filled.
 - Once all slots are filled, the magazine shifts right, becomes the previous magazine, and a waiting magazine moves into the center.
 - A perfect magazine produces `multiplier` magazines.

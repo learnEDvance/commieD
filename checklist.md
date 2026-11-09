@@ -31,7 +31,10 @@ Tick only verified work. One small step at a time.
 - [x] Two empty magazines queued left of current; previous magazine kept on the right
 - [x] Feed lines fill upward when a slot is loaded (green correct, red wrong)
 - [x] Single horizontal feeder from the right splits into 10 vertical bullet branches
-- [x] Continuous bullet stream along the main feeder
+- [x] Main feeder stops at the leftmost branch and serves only this station
+- [x] Main feeder paints above the 10 branch feed layers
+- [x] Main feeder stays clogged while branches are full and indexes one bullet per load
+- [x] Branches refill from the main feeder instead of shrinking
 - [x] Magazine shift animation shortened by 200ms
 - [x] Feed bullets centered on their lines and sized to the slots
 - [x] Bullet columns run up every feed and advance when a slot loads
@@ -44,7 +47,7 @@ Tick only verified work. One small step at a time.
 - [x] Broken magazines stay until all slots fill
 - [x] Whole-number speed multipliers (`x1`–`x5`) from average time per key
 - [x] Unit tests for sequences, slots, broken magazines, speed multipliers, production
-- [x] Browser smoke test: centered rail, queue positions, arrows, bullet columns, feed advance, perfect magazine, ejection, next magazine, broken magazine
+- [x] Browser smoke test: centered rail, queue positions, arrows, bullet columns, clogged feeder, feeder localization, feed layering, feed refill, perfect magazine, ejection, next magazine, broken magazine
 - [x] Run instructions and rules documented in `bullet-press/README.md`
 - [ ] Tune the speed thresholds through playtesting
 - [ ] Confirm broken magazines should award `x0`
