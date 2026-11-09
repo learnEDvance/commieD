@@ -306,7 +306,13 @@ test('refuses the bottler until every process is complete', () => {
 });
 
 test('the bottler holds four pots and rejects the fifth', () => {
-  const factory = makeFactory({ ...FAST_CONFIG, stationCapacity: 5 });
+  // A long ready window keeps the waiting fifth pot from spoiling while the
+  // bottler drains the first four.
+  const factory = makeFactory({
+    ...FAST_CONFIG,
+    processes: [{ ...FAST_PROCESS, windowMs: 5000 }],
+    stationCapacity: 5,
+  });
   takePots(factory, 5);
 
   for (let id = 1; id <= 5; id += 1) {

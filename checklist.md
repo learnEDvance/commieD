@@ -66,6 +66,7 @@ Tick only verified work. One small step at a time.
 - [x] Confirm bottling math (1 pot = 20 vials = 20 seconds)
 - [x] Define twelve numbered communist-themed processes over six reusable stations
 - [x] Pure core: unlimited intake, station drop validation, 4-slot capacity, automatic work, ready windows, spoilage, bottler, vials
+- [x] Bottler accepts four pots and rejects the fifth until a slot clears
 - [x] Deterministic `advance(deltaMs)` tick with process, spoil, and bottling events
 - [x] Unit tests for route order, station reuse, capacity, wrong drops, busy pots, spoilage, bottling, output APIs, determinism, validation
 - [x] Run instructions and core API documented in `dash-supplement-factory/README.md`
