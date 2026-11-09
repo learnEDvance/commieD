@@ -2,487 +2,454 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  BASE_RECIPE,
-  DEFAULT_RECIPE,
   DashSupplementFactory,
-  PHASES,
+  POT_STATUS,
+  PROCESSES,
+  STATIONS,
 } from '../src/dashSupplementFactoryCore.js';
+
+const FAST_PROCESS = {
+  id: 'only-process',
+  order: 1,
+  name: 'ONLY PROCESS',
+  stationId: 'mill',
+  durationMs: 100,
+  windowMs: 300,
+};
+
+const FAST_CONFIG = {
+  processes: [FAST_PROCESS],
+  bottlingMs: 100,
+  vialsPerPot: 20,
+  secondsPerVial: 1,
+};
 
 function makeFactory(config = {}) {
   return new DashSupplementFactory({ config });
 }
 
-function takePots(factory, count) {
+function takePots(factory, count = 1) {
+  const events = [];
+
   for (let i = 0; i < count; i += 1) {
-    assert.equal(factory.takePot().type, 'pot-taken');
+    const event = factory.takePot();
+    assert.equal(event.type, 'pot-taken');
+    events.push(event);
+  }
+  return events;
+}
+
+function drop(factory, potId, targetId) {
+  return factory.dropPot(potId, targetId);
+}
+
+function finishSingleProcess(factory, potId) {
+  assert.equal(drop(factory, potId, FAST_PROCESS.stationId).type, 'pot-dropped');
+  const tick = factory.advance(FAST_PROCESS.durationMs);
+  assert.equal(tick.events[0]?.type, 'process-complete');
+}
+
+function finishFullRoute(factory, potId) {
+  for (const process of factory.processes) {
+    const dropped = drop(factory, potId, process.stationId);
+    assert.equal(dropped.type, 'pot-dropped', JSON.stringify(dropped));
+    const tick = factory.advance(process.durationMs);
+    assert.equal(
+      tick.events.filter((event) => event.type === 'process-complete').length,
+      1,
+    );
   }
 }
 
-function addIngredient(factory, id) {
-  const event = factory.addIngredient(id);
-  assert.ok(
-    event.type === 'batch-started' || event.type === 'ingredient-added',
-    `expected ${id} to be accepted, got ${event.type}:${event.reason ?? ''}`,
-  );
-  return event;
-}
-
-function holdFor(factory, stepId, ms) {
-  const started = factory.beginHold(stepId);
-  assert.equal(started.type, 'hold-started');
-  return factory.advanceHold(ms);
-}
-
-function finishRecipe(factory) {
-  addIngredient(factory, 'vodka');
-  addIngredient(factory, 'beet-extract');
-  holdFor(factory, 'stir', 1800);
-  addIngredient(factory, 'national-spirit');
-  holdFor(factory, 'heat', 2200);
-  holdFor(factory, 'filter', 1400);
-  assert.equal(factory.phase, PHASES.MOVING);
-}
-
-function moveAllPots(factory) {
-  while (factory.pots.some((pot) => pot.location === 'main')) {
-    assert.equal(factory.moveNextPot().type, 'pot-moved');
-  }
-}
-
-function bottleAllPots(factory) {
-  while (factory.phase === PHASES.BOTTLING) {
-    const event = factory.bottleNextPot();
-    assert.ok(event.type === 'bottled' || event.type === 'batch-complete');
-  }
-}
-
-test('starts empty and collecting', () => {
-  const factory = makeFactory();
-
-  assert.equal(factory.phase, PHASES.COLLECTING);
-  assert.equal(factory.batchSize, 0);
-  assert.equal(factory.canTakePot, true);
-  assert.equal(factory.canStartBatch, false);
-  assert.equal(factory.nextAction, 'take-pots');
-  assert.deepEqual(factory.pots, []);
-});
-
-test('takes up to five pots and rejects a sixth', () => {
-  const factory = makeFactory();
-  takePots(factory, 5);
-
-  assert.equal(factory.batchSize, 5);
+test('ships twelve numbered processes across six reused stations', () => {
+  assert.equal(PROCESSES.length, 12);
+  assert.equal(STATIONS.length, 6);
   assert.deepEqual(
-    factory.pots.map((pot) => pot.id),
-    [1, 2, 3, 4, 5],
+    [...new Set(PROCESSES.map((process) => process.stationId))].sort(),
+    STATIONS.map((station) => station.id).sort(),
   );
-  assert.equal(factory.canTakePot, false);
 
-  const rejected = factory.takePot();
-  assert.equal(rejected.type, 'rejected');
-  assert.equal(rejected.reason, 'batch-full');
-  assert.equal(factory.phase, PHASES.COLLECTING);
-  assert.equal(factory.batchSize, 5);
-});
-
-test('adding vodka without pots is rejected', () => {
-  const factory = makeFactory();
-  const result = factory.addIngredient('vodka');
-
-  assert.equal(result.type, 'rejected');
-  assert.equal(result.reason, 'no-pots');
-  assert.equal(factory.phase, PHASES.COLLECTING);
-});
-
-test('stray factory actions before any pot is taken are rejected, not failed', () => {
-  const factory = makeFactory();
-
-  for (const result of [
-    factory.movePot(1),
-    factory.moveNextPot(),
-    factory.bottleNextPot(),
-    factory.beginHold('stir'),
-  ]) {
-    assert.equal(result.type, 'rejected');
-    assert.equal(result.reason, 'no-pots');
+  const uses = Object.fromEntries(STATIONS.map((station) => [station.id, 0]));
+  for (const process of PROCESSES) {
+    uses[process.stationId] += 1;
   }
 
-  assert.equal(factory.phase, PHASES.COLLECTING);
-  assert.equal(factory.batchesFailed, 0);
-  assert.equal(factory.lastBatch, null);
+  assert.equal(uses.mill, 1);
+  assert.equal(uses.vat, 3);
+  assert.equal(uses.press, 2);
+  assert.equal(uses.still, 2);
+  assert.equal(uses.filter, 2);
+  assert.equal(uses.bureau, 2);
 });
 
-test('adding vodka starts the batch and moves to beet extract', () => {
+test('starts with an empty floor and no output', () => {
   const factory = makeFactory();
-  takePots(factory, 3);
 
-  const event = factory.addIngredient('vodka');
-  assert.equal(event.type, 'batch-started');
-  assert.equal(event.batchSize, 3);
-  assert.equal(factory.phase, PHASES.PROCESSING);
-  assert.equal(factory.currentStep.id, 'beet-extract');
-  assert.equal(factory.nextAction, 'beet-extract');
-  assert.equal(factory.canTakePot, false);
-});
-
-test('the default recipe reaches the moving phase', () => {
-  const factory = makeFactory();
-  takePots(factory, 4);
-  finishRecipe(factory);
-
-  assert.equal(factory.phase, PHASES.MOVING);
-  assert.equal(factory.nextAction, 'move-pots');
-  assert.deepEqual(
-    factory.pots.map((pot) => pot.location),
-    ['main', 'main', 'main', 'main'],
-  );
-});
-
-test('hold progress is reported and completes the step', () => {
-  const factory = makeFactory();
-  takePots(factory, 1);
-  addIngredient(factory, 'vodka');
-  addIngredient(factory, 'beet-extract');
-
-  assert.equal(factory.beginHold('stir').type, 'hold-started');
-  const half = factory.advanceHold(900);
-  assert.equal(half.type, 'hold-progress');
-  assert.equal(half.progress, 0.5);
-  assert.equal(factory.holdProgress, 0.5);
-
-  const done = factory.advanceHold(900);
-  assert.equal(done.type, 'hold-completed');
-  assert.equal(done.stepId, 'stir');
-  assert.equal(factory.currentStep.id, 'national-spirit');
-  assert.equal(factory.hold, null);
-});
-
-test('releasing a hold early fails and wastes the whole batch', () => {
-  const factory = makeFactory();
-  takePots(factory, 3);
-  addIngredient(factory, 'vodka');
-  addIngredient(factory, 'beet-extract');
-  factory.beginHold('stir');
-  factory.advanceHold(500);
-
-  const failed = factory.releaseHold();
-  assert.equal(failed.type, 'batch-failed');
-  assert.equal(failed.reason, 'released-early');
-  assert.equal(factory.phase, PHASES.FAILED);
-  assert.equal(factory.failureReason, 'released-early');
-  assert.equal(factory.batchBottles, 0);
-  assert.equal(factory.batchesFailed, 1);
-  assert.ok(factory.pots.every((pot) => pot.wasted && pot.location === 'wasted'));
-  assert.equal(factory.lastBatch.failed, true);
-  assert.equal(factory.lastBatch.bottles, 0);
-});
-
-test('a wrong ingredient fails the batch', () => {
-  const factory = makeFactory();
-  takePots(factory, 2);
-  addIngredient(factory, 'vodka');
-
-  const failed = factory.addIngredient('national-spirit');
-  assert.equal(failed.type, 'batch-failed');
-  assert.equal(failed.reason, 'wrong-order');
-  assert.equal(factory.phase, PHASES.FAILED);
-});
-
-test('a wrong hold fails the batch', () => {
-  const factory = makeFactory();
-  takePots(factory, 2);
-  addIngredient(factory, 'vodka');
-  addIngredient(factory, 'beet-extract');
-
-  const failed = factory.beginHold('heat');
-  assert.equal(failed.type, 'batch-failed');
-  assert.equal(failed.reason, 'wrong-order');
-  assert.equal(factory.phase, PHASES.FAILED);
-});
-
-test('adding an ingredient during a hold fails the batch', () => {
-  const factory = makeFactory();
-  takePots(factory, 1);
-  addIngredient(factory, 'vodka');
-  addIngredient(factory, 'beet-extract');
-  factory.beginHold('stir');
-  factory.advanceHold(200);
-
-  const failed = factory.addIngredient('national-spirit');
-  assert.equal(failed.type, 'batch-failed');
-  assert.equal(failed.reason, 'wrong-order');
-});
-
-test('unknown ingredient and hold ids are rejected without failing', () => {
-  const factory = makeFactory();
-  takePots(factory, 1);
-
-  const unknownIngredient = factory.addIngredient('unobtainium');
-  assert.equal(unknownIngredient.type, 'rejected');
-  assert.equal(unknownIngredient.reason, 'unknown-ingredient');
-  assert.equal(factory.phase, PHASES.COLLECTING);
-
-  addIngredient(factory, 'vodka');
-  addIngredient(factory, 'beet-extract');
-  const unknownHold = factory.beginHold('unobtainium');
-  assert.equal(unknownHold.type, 'rejected');
-  assert.equal(unknownHold.reason, 'unknown-hold');
-  assert.equal(factory.phase, PHASES.PROCESSING);
-});
-
-test('non-positive hold deltas are ignored', () => {
-  const factory = makeFactory();
-  takePots(factory, 1);
-  addIngredient(factory, 'vodka');
-  addIngredient(factory, 'beet-extract');
-  factory.beginHold('stir');
-
-  assert.equal(factory.advanceHold(0).type, 'noop');
-  assert.equal(factory.advanceHold(-50).type, 'noop');
-  assert.equal(factory.holdProgress, 0);
-});
-
-test('releasing after a completed hold is a no-op', () => {
-  const factory = makeFactory();
-  takePots(factory, 1);
-  addIngredient(factory, 'vodka');
-  addIngredient(factory, 'beet-extract');
-  factory.beginHold('stir');
-
-  assert.equal(factory.advanceHold(1800).type, 'hold-completed');
-  assert.equal(factory.releaseHold().type, 'noop');
-  assert.equal(factory.phase, PHASES.PROCESSING);
-});
-
-test('moves pots independently and starts bottling when all arrive', () => {
-  const factory = makeFactory();
-  takePots(factory, 3);
-  finishRecipe(factory);
-
-  const first = factory.movePot(3);
-  assert.equal(first.type, 'pot-moved');
-  assert.equal(first.remaining, 2);
-  assert.equal(factory.phase, PHASES.MOVING);
-
-  const second = factory.movePot(1);
-  assert.equal(second.remaining, 1);
-  assert.equal(factory.phase, PHASES.MOVING);
-
-  const third = factory.movePot(2);
-  assert.equal(third.remaining, 0);
-  assert.equal(factory.phase, PHASES.BOTTLING);
-  assert.equal(factory.nextAction, 'bottle');
-});
-
-test('unknown pot ids are rejected while moving', () => {
-  const factory = makeFactory();
-  takePots(factory, 2);
-  finishRecipe(factory);
-
-  const result = factory.movePot(99);
-  assert.equal(result.type, 'rejected');
-  assert.equal(result.reason, 'unknown-pot');
-  assert.equal(factory.phase, PHASES.MOVING);
-});
-
-test('five pots bottle into one hundred seconds', () => {
-  const factory = makeFactory();
-  takePots(factory, 5);
-  finishRecipe(factory);
-  moveAllPots(factory);
-  assert.equal(factory.phase, PHASES.BOTTLING);
-
-  for (let i = 1; i <= 4; i += 1) {
-    const event = factory.bottleNextPot();
-    assert.equal(event.type, 'bottled');
-    assert.equal(event.bottles, 20);
-    assert.equal(event.batchBottles, i * 20);
-    assert.equal(event.complete, false);
-    assert.equal(factory.bottlesProduced, 0);
-  }
-
-  const complete = factory.bottleNextPot();
-  assert.equal(complete.type, 'batch-complete');
-  assert.equal(complete.bottles, 100);
-  assert.equal(complete.seconds, 100);
-  assert.equal(complete.phase, PHASES.COMPLETE);
-  assert.equal(factory.bottlesProduced, 100);
-  assert.equal(factory.secondsProduced, 100);
-  assert.equal(factory.batchesCompleted, 1);
-  assert.deepEqual(factory.lastBatch, {
-    pots: 5,
-    bottles: 100,
-    seconds: 100,
-    failed: false,
-    reason: null,
+  assert.equal(factory.activePots.length, 0);
+  assert.equal(factory.vialsProduced, 0);
+  assert.equal(factory.secondsProduced, 0);
+  assert.equal(factory.potsSpoiled, 0);
+  assert.deepEqual(factory.occupancy, {
+    mill: 0,
+    vat: 0,
+    press: 0,
+    still: 0,
+    filter: 0,
+    bureau: 0,
+    bottler: 0,
   });
-  assert.ok(factory.pots.every((pot) => pot.bottled && pot.location === 'bottled'));
 });
 
-test('the base recipe also produces one hundred seconds for five pots', () => {
-  const factory = makeFactory({ recipe: BASE_RECIPE });
+test('takes unlimited empty pots at the intake', () => {
+  const factory = makeFactory();
+
+  takePots(factory, 20);
+
+  assert.equal(factory.intakePots.length, 20);
+  assert.equal(factory.activePots.length, 20);
+  assert.deepEqual(
+    factory.intakePots.map((pot) => pot.id),
+    Array.from({ length: 20 }, (_, index) => index + 1),
+  );
+});
+
+test('rejects a wrong station and leaves the pot at the intake', () => {
+  const factory = makeFactory();
+  takePots(factory, 1);
+
+  const event = drop(factory, 1, 'vat');
+
+  assert.equal(event.type, 'rejected');
+  assert.equal(event.reason, 'wrong-station');
+  assert.equal(event.expectedStationId, 'mill');
+  assert.equal(factory.pots[0].location, 'intake');
+  assert.equal(factory.pots[0].stepIndex, 0);
+});
+
+test('starts working when dropped on the correct station', () => {
+  const factory = makeFactory();
+  takePots(factory, 1);
+
+  const event = drop(factory, 1, 'mill');
+
+  assert.equal(event.type, 'pot-dropped');
+  assert.equal(event.step.order, 1);
+  assert.equal(factory.pots[0].status, POT_STATUS.WORKING);
+  assert.equal(factory.pots[0].progressMs, 0);
+  assert.equal(factory.occupancy.mill, 1);
+});
+
+test('does not let a working pot leave early', () => {
+  const factory = makeFactory();
+  takePots(factory, 1);
+  drop(factory, 1, 'mill');
+  factory.advance(500);
+
+  const event = drop(factory, 1, 'vat');
+
+  assert.equal(event.type, 'rejected');
+  assert.equal(event.reason, 'pot-busy');
+  assert.equal(factory.pots[0].location, 'mill');
+  assert.equal(factory.pots[0].status, POT_STATUS.WORKING);
+  assert.equal(factory.pots[0].progressMs, 500);
+});
+
+test('completes a process and opens the ready window', () => {
+  const factory = makeFactory();
+  takePots(factory, 1);
+  drop(factory, 1, 'mill');
+
+  const first = factory.advance(1500);
+
+  assert.equal(first.events.length, 1);
+  assert.equal(first.events[0].type, 'process-complete');
+  assert.equal(first.events[0].nextStep.stationId, 'vat');
+  assert.equal(factory.pots[0].status, POT_STATUS.READY);
+  assert.equal(factory.pots[0].stepIndex, 1);
+  assert.equal(factory.pots[0].windowMsLeft, 7000);
+
+  const second = factory.advance(1000);
+
+  assert.equal(second.events.length, 0);
+  assert.equal(factory.pots[0].windowMsLeft, 6000);
+});
+
+test('a ready pot can move to the next station', () => {
+  const factory = makeFactory();
+  takePots(factory, 1);
+  drop(factory, 1, 'mill');
+  factory.advance(1500);
+
+  const event = drop(factory, 1, 'vat');
+
+  assert.equal(event.type, 'pot-dropped');
+  assert.equal(event.step.order, 2);
+  assert.equal(factory.pots[0].location, 'vat');
+  assert.equal(factory.pots[0].status, POT_STATUS.WORKING);
+  assert.equal(factory.occupancy.mill, 0);
+  assert.equal(factory.occupancy.vat, 1);
+});
+
+test('a wrong station after completion leaves a ready pot where it was', () => {
+  const factory = makeFactory();
+  takePots(factory, 1);
+  drop(factory, 1, 'mill');
+  factory.advance(1500);
+
+  const event = drop(factory, 1, 'still');
+
+  assert.equal(event.type, 'rejected');
+  assert.equal(event.reason, 'wrong-station');
+  assert.equal(event.expectedStationId, 'vat');
+  assert.equal(factory.pots[0].location, 'mill');
+  assert.equal(factory.pots[0].status, POT_STATUS.READY);
+});
+
+test('a station holds four pots and rejects the fifth', () => {
+  const factory = makeFactory();
   takePots(factory, 5);
 
-  addIngredient(factory, 'vodka');
-  holdFor(factory, 'stir', 1800);
-  addIngredient(factory, 'national-spirit');
-  holdFor(factory, 'heat', 2200);
+  for (let id = 1; id <= 4; id += 1) {
+    assert.equal(drop(factory, id, 'mill').type, 'pot-dropped');
+  }
 
-  assert.equal(factory.phase, PHASES.MOVING);
-  moveAllPots(factory);
-  bottleAllPots(factory);
+  const event = drop(factory, 5, 'mill');
 
-  assert.equal(factory.bottlesProduced, 100);
-  assert.equal(factory.secondsProduced, 100);
+  assert.equal(event.type, 'rejected');
+  assert.equal(event.reason, 'station-full');
+  assert.equal(factory.pots[4].location, 'intake');
+  assert.equal(factory.occupancy.mill, 4);
 });
 
-test('failure after partial bottling discards the pending bottles', () => {
+test('stations can process different steps of the route at once', () => {
   const factory = makeFactory();
   takePots(factory, 2);
-  finishRecipe(factory);
-  moveAllPots(factory);
 
-  const first = factory.bottleNextPot();
-  assert.equal(first.type, 'bottled');
-  assert.equal(factory.batchBottles, 20);
-  assert.equal(factory.bottlesProduced, 0);
+  drop(factory, 1, 'mill');
+  factory.advance(1500);
+  drop(factory, 1, 'vat');
+  factory.advance(1400);
 
-  const failed = factory.addIngredient('vodka');
-  assert.equal(failed.type, 'batch-failed');
-  assert.equal(failed.reason, 'wrong-order');
-  assert.equal(factory.batchBottles, 0);
-  assert.equal(factory.bottlesProduced, 0);
-  assert.equal(factory.lastBatch.failed, true);
-  assert.equal(factory.lastBatch.bottles, 0);
-  assert.ok(factory.pots.every((pot) => pot.wasted));
+  // Pot 2 is still on mill's step; pot 1 is ready at the vat on step 3.
+  assert.equal(factory.pots[0].stepIndex, 2);
+  assert.equal(factory.pots[0].status, POT_STATUS.READY);
+
+  drop(factory, 2, 'mill');
+  factory.advance(1500);
+  assert.equal(drop(factory, 2, 'vat').type, 'pot-dropped');
+  assert.equal(factory.occupancy.vat, 2);
+  assert.equal(factory.pots[1].stepIndex, 1);
+  assert.equal(factory.pots[1].status, POT_STATUS.WORKING);
 });
 
-test('moving before heating fails the batch', () => {
+test('an uncollected ready pot spoils and frees its slot', () => {
+  const factory = makeFactory(FAST_CONFIG);
+  takePots(factory, 1);
+  finishSingleProcess(factory, 1);
+
+  const nearly = factory.advance(299);
+  assert.equal(nearly.events.length, 0);
+  assert.equal(factory.pots[0].status, POT_STATUS.READY);
+
+  const late = factory.advance(1);
+
+  assert.equal(late.events.length, 1);
+  assert.equal(late.events[0].type, 'pot-spoiled');
+  assert.equal(late.events[0].reason, 'window');
+  assert.equal(factory.pots[0].status, POT_STATUS.SPOILED);
+  assert.equal(factory.pots[0].location, 'exited');
+  assert.equal(factory.occupancy.mill, 0);
+  assert.equal(factory.activePots.length, 0);
+  assert.equal(factory.potsSpoiled, 1);
+});
+
+test('the full route reuses stations and ends at the bottler', () => {
   const factory = makeFactory();
   takePots(factory, 1);
-  addIngredient(factory, 'vodka');
-  addIngredient(factory, 'beet-extract');
 
-  const failed = factory.moveNextPot();
-  assert.equal(failed.type, 'batch-failed');
-  assert.equal(failed.reason, 'wrong-order');
+  finishFullRoute(factory, 1);
+
+  assert.equal(factory.pots[0].stepIndex, PROCESSES.length);
+  assert.equal(factory.pots[0].status, POT_STATUS.READY);
+
+  const dropped = drop(factory, 1, 'bottler');
+  assert.equal(dropped.type, 'pot-dropped');
+  assert.equal(factory.pots[0].status, POT_STATUS.BOTTLING);
+
+  const tick = factory.advance(900);
+  assert.equal(tick.events.length, 1);
+  assert.equal(tick.events[0].type, 'pot-bottled');
+  assert.equal(tick.events[0].vials, 20);
+  assert.equal(tick.events[0].seconds, 20);
+  assert.equal(factory.vialsProduced, 20);
+  assert.equal(factory.secondsProduced, 20);
+  assert.equal(factory.potsBottled, 1);
+  assert.equal(factory.pots[0].status, POT_STATUS.DONE);
+  assert.equal(factory.pots[0].bottled, true);
 });
 
-test('bottling before moving all pots fails the batch', () => {
-  const factory = makeFactory();
-  takePots(factory, 2);
-  finishRecipe(factory);
-
-  const failed = factory.bottleNextPot();
-  assert.equal(failed.type, 'batch-failed');
-  assert.equal(failed.reason, 'wrong-order');
-});
-
-test('a failed batch must be destroyed before starting again', () => {
-  const factory = makeFactory();
-  takePots(factory, 1);
-  addIngredient(factory, 'vodka');
-
-  assert.equal(factory.addIngredient('national-spirit').type, 'batch-failed');
-  assert.equal(factory.takePot().reason, 'destroy-required');
-  assert.equal(factory.startBatch().reason, 'destroy-required');
-  assert.equal(factory.newBatch().reason, 'destroy-required');
-
-  const destroyed = factory.destroyBatch();
-  assert.equal(destroyed.type, 'batch-destroyed');
-  assert.equal(factory.phase, PHASES.COLLECTING);
-  assert.deepEqual(factory.pots, []);
-  assert.equal(factory.failureReason, null);
-  assert.equal(factory.batchesFailed, 1);
-  assert.equal(factory.takePot().type, 'pot-taken');
-});
-
-test('taking a pot after a completed batch starts a new batch', () => {
+test('refuses the bottler until every process is complete', () => {
   const factory = makeFactory();
   takePots(factory, 1);
-  finishRecipe(factory);
-  moveAllPots(factory);
-  factory.bottleNextPot();
 
-  assert.equal(factory.phase, PHASES.COMPLETE);
-  assert.equal(factory.bottlesProduced, 20);
+  const event = drop(factory, 1, 'bottler');
 
-  const next = factory.takePot();
-  assert.equal(next.type, 'pot-taken');
-  assert.equal(next.batchSize, 1);
-  assert.equal(factory.phase, PHASES.COLLECTING);
-  assert.equal(factory.bottlesProduced, 20);
-  assert.equal(factory.batchesCompleted, 1);
+  assert.equal(event.type, 'rejected');
+  assert.equal(event.reason, 'processes-remaining');
+  assert.equal(event.process.stationId, 'mill');
+  assert.equal(factory.pots[0].location, 'intake');
 });
 
-test('newBatch returns to collecting without losing output', () => {
-  const factory = makeFactory();
-  takePots(factory, 2);
-  finishRecipe(factory);
-  moveAllPots(factory);
-  bottleAllPots(factory);
+test('the bottler holds four pots and rejects the fifth', () => {
+  const factory = makeFactory({ ...FAST_CONFIG, stationCapacity: 5 });
+  takePots(factory, 5);
 
-  assert.equal(factory.newBatch().type, 'new-batch');
-  assert.equal(factory.phase, PHASES.COLLECTING);
-  assert.equal(factory.batchSize, 0);
-  assert.equal(factory.bottlesProduced, 40);
+  for (let id = 1; id <= 5; id += 1) {
+    assert.equal(drop(factory, id, 'mill').type, 'pot-dropped');
+  }
+  factory.advance(FAST_PROCESS.durationMs);
+
+  for (let id = 1; id <= 4; id += 1) {
+    assert.equal(drop(factory, id, 'bottler').type, 'pot-dropped');
+  }
+
+  const fifth = drop(factory, 5, 'bottler');
+  assert.equal(fifth.type, 'rejected');
+  assert.equal(fifth.reason, 'bottler-full');
+  assert.equal(factory.occupancy.bottler, 4);
+
+  const tick = factory.advance(100);
+  assert.equal(
+    tick.events.filter((event) => event.type === 'pot-bottled').length,
+    4,
+  );
+  assert.equal(factory.vialsProduced, 80);
+  assert.equal(factory.activePots.length, 1);
+  assert.equal(drop(factory, 5, 'bottler').type, 'pot-dropped');
 });
 
-test('takeBottles and takeSeconds clear the produced output', () => {
-  const factory = makeFactory();
-  takePots(factory, 2);
-  finishRecipe(factory);
-  moveAllPots(factory);
-  bottleAllPots(factory);
+test('one tick can complete several pots deterministically', () => {
+  const factory = makeFactory(FAST_CONFIG);
+  takePots(factory, 3);
 
-  assert.equal(factory.takeBottles(), 40);
-  assert.equal(factory.bottlesProduced, 0);
+  for (let id = 1; id <= 3; id += 1) {
+    drop(factory, id, 'mill');
+  }
+
+  const processed = factory.advance(100);
+  assert.deepEqual(
+    processed.events.map((event) => [event.type, event.potId]),
+    [
+      ['process-complete', 1],
+      ['process-complete', 2],
+      ['process-complete', 3],
+    ],
+  );
+
+  for (let id = 1; id <= 3; id += 1) {
+    drop(factory, id, 'bottler');
+  }
+
+  const bottled = factory.advance(100);
+  assert.deepEqual(
+    bottled.events.map((event) => [event.type, event.potId]),
+    [
+      ['pot-bottled', 1],
+      ['pot-bottled', 2],
+      ['pot-bottled', 3],
+    ],
+  );
+  assert.equal(factory.vialsProduced, 60);
+});
+
+test('takeVials and takeSeconds drain the produced output', () => {
+  const factory = makeFactory({ ...FAST_CONFIG, secondsPerVial: 2 });
+  takePots(factory, 1);
+  finishSingleProcess(factory, 1);
+  drop(factory, 1, 'bottler');
+  factory.advance(100);
+
+  assert.equal(factory.vialsProduced, 20);
+  assert.equal(factory.secondsProduced, 40);
+  assert.equal(factory.takeVials(), 20);
+  assert.equal(factory.vialsProduced, 0);
+  assert.equal(factory.takeBottles(), 0);
   assert.equal(factory.takeSeconds(), 0);
-
-  factory.newBatch();
-  takePots(factory, 1);
-  finishRecipe(factory);
-  moveAllPots(factory);
-  bottleAllPots(factory);
-
-  assert.equal(factory.takeSeconds(), 20);
-  assert.equal(factory.bottlesProduced, 0);
 });
 
-test('supports a recipe that starts with a hold via startBatch', () => {
-  const factory = makeFactory({
-    recipe: [{ id: 'stir', type: 'hold', durationMs: 100 }],
-  });
+test('rejects unknown pots and stations without changing state', () => {
+  const factory = makeFactory();
   takePots(factory, 1);
 
-  assert.equal(factory.startBatch().type, 'batch-started');
-  assert.equal(factory.currentStep.id, 'stir');
-  assert.equal(factory.beginHold('stir').type, 'hold-started');
-  assert.equal(factory.advanceHold(100).type, 'hold-completed');
-  assert.equal(factory.phase, PHASES.MOVING);
+  assert.equal(drop(factory, 99, 'mill').reason, 'unknown-pot');
+  assert.equal(drop(factory, 1, 'spa').reason, 'unknown-station');
+  assert.equal(factory.pots[0].location, 'intake');
 });
 
-test('validates configuration', () => {
-  assert.throws(() => makeFactory({ maxPotsPerBatch: 0 }), /maxPotsPerBatch/);
-  assert.throws(() => makeFactory({ bottlesPerPot: 0 }), /bottlesPerPot/);
-  assert.throws(() => makeFactory({ secondsPerBottle: 0 }), /secondsPerBottle/);
-  assert.throws(() => makeFactory({ recipe: [] }), /recipe/);
+test('advance ignores non-positive or invalid deltas', () => {
+  const factory = makeFactory();
+  takePots(factory, 1);
+  drop(factory, 1, 'mill');
+
+  for (const delta of [0, -5, Number.NaN, Infinity]) {
+    const tick = factory.advance(delta);
+    assert.equal(tick.type, 'tick');
+    assert.equal(tick.events.length, 0);
+    assert.equal(factory.pots[0].progressMs, 0);
+  }
+});
+
+test('is deterministic for the same action sequence', () => {
+  function run() {
+    const factory = makeFactory(FAST_CONFIG);
+    takePots(factory, 2);
+    drop(factory, 1, 'mill');
+    drop(factory, 2, 'mill');
+    factory.advance(100);
+    drop(factory, 1, 'bottler');
+    factory.advance(100);
+    return factory;
+  }
+
+  const a = run();
+  const b = run();
+
+  assert.deepEqual(a.pots, b.pots);
+  assert.deepEqual(a.occupancy, b.occupancy);
+  assert.equal(a.vialsProduced, b.vialsProduced);
+  assert.equal(a.elapsedMs, b.elapsedMs);
+});
+
+test('validates stations, processes, capacities, and timings', () => {
   assert.throws(
-    () => makeFactory({ recipe: [{ id: 'x', type: 'hold', durationMs: 0 }] }),
-    /durationMs/,
+    () => makeFactory({ stations: [] }),
+    /stations must contain at least one station/,
+  );
+  assert.throws(
+    () => makeFactory({ processes: [] }),
+    /processes must contain at least one process/,
   );
   assert.throws(
     () =>
       makeFactory({
-        recipe: [
-          { id: 'x', type: 'add' },
-          { id: 'x', type: 'add' },
-        ],
+        processes: [{ ...FAST_PROCESS, stationId: 'nowhere' }],
       }),
-    /duplicate/,
+    /unknown station/,
   );
-});
-
-test('the default recipe is longer than the base recipe', () => {
-  assert.ok(DEFAULT_RECIPE.length > BASE_RECIPE.length);
+  assert.throws(
+    () => makeFactory({ stationCapacity: 0 }),
+    /stationCapacity must be a positive integer/,
+  );
+  assert.throws(
+    () => makeFactory({ bottlerCapacity: 0 }),
+    /bottlerCapacity must be a positive integer/,
+  );
+  assert.throws(
+    () => makeFactory({ processes: [{ ...FAST_PROCESS, durationMs: 0 }] }),
+    /positive durationMs/,
+  );
+  assert.throws(
+    () => makeFactory({ processes: [{ ...FAST_PROCESS, windowMs: 0 }] }),
+    /positive windowMs/,
+  );
 });

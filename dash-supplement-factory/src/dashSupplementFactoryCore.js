@@ -1,224 +1,312 @@
-export const BASE_RECIPE = Object.freeze([
-  Object.freeze({ id: 'vodka', type: 'add', label: 'Add vodka' }),
-  Object.freeze({ id: 'stir', type: 'hold', label: 'Hold to stir', durationMs: 1800 }),
-  Object.freeze({ id: 'national-spirit', type: 'add', label: 'Add national spirit' }),
-  Object.freeze({ id: 'heat', type: 'hold', label: 'Hold to heat', durationMs: 2200 }),
+export const STATIONS = Object.freeze([
+  Object.freeze({ id: 'mill', name: 'GRAIN MILL', short: 'MILL', kind: 'mill' }),
+  Object.freeze({ id: 'vat', name: 'MASH VAT', short: 'VAT', kind: 'vat' }),
+  Object.freeze({ id: 'press', name: 'AGITATOR PRESS', short: 'PRESS', kind: 'press' }),
+  Object.freeze({ id: 'still', name: 'SPIRIT STILL', short: 'STILL', kind: 'still' }),
+  Object.freeze({ id: 'filter', name: 'PURITY FILTER', short: 'FILTER', kind: 'filter' }),
+  Object.freeze({ id: 'bureau', name: 'PLAN BUREAU', short: 'BUREAU', kind: 'bureau' }),
 ]);
 
-// The source process, with two extra factory steps added so a batch takes a
-// little longer. Pass `recipe: BASE_RECIPE` to play the short version.
-export const DEFAULT_RECIPE = Object.freeze([
-  Object.freeze({ id: 'vodka', type: 'add', label: 'Add vodka' }),
-  Object.freeze({ id: 'beet-extract', type: 'add', label: 'Add beet extract' }),
-  Object.freeze({ id: 'stir', type: 'hold', label: 'Hold to stir', durationMs: 1800 }),
-  Object.freeze({ id: 'national-spirit', type: 'add', label: 'Add national spirit' }),
-  Object.freeze({ id: 'heat', type: 'hold', label: 'Hold to heat', durationMs: 2200 }),
-  Object.freeze({ id: 'filter', type: 'hold', label: 'Hold to filter', durationMs: 1400 }),
+// Twelve numbered processes. Stations are deliberately reused: a pot visits the
+// vat three times, the still and bureau twice, and the mill, press, and filter
+// once each. The final drop is the bottler.
+export const PROCESSES = Object.freeze([
+  Object.freeze({
+    id: 'seize-harvest',
+    order: 1,
+    name: 'SEIZE THE HARVEST',
+    stationId: 'mill',
+    durationMs: 1500,
+    windowMs: 7000,
+  }),
+  Object.freeze({
+    id: 'nationalize-mash',
+    order: 2,
+    name: 'NATIONALIZE THE MASH',
+    stationId: 'vat',
+    durationMs: 1400,
+    windowMs: 7000,
+  }),
+  Object.freeze({
+    id: 'agitate-masses',
+    order: 3,
+    name: 'AGITATE THE MASSES',
+    stationId: 'press',
+    durationMs: 1200,
+    windowMs: 6500,
+  }),
+  Object.freeze({
+    id: 'distill-spirit',
+    order: 4,
+    name: 'DISTILL THE SPIRIT',
+    stationId: 'still',
+    durationMs: 1900,
+    windowMs: 6500,
+  }),
+  Object.freeze({
+    id: 'collectivize-vat',
+    order: 5,
+    name: 'COLLECTIVIZE THE VAT',
+    stationId: 'vat',
+    durationMs: 1500,
+    windowMs: 7000,
+  }),
+  Object.freeze({
+    id: 'purge-deviations',
+    order: 6,
+    name: 'PURGE DEVIATIONS',
+    stationId: 'filter',
+    durationMs: 1400,
+    windowMs: 6500,
+  }),
+  Object.freeze({
+    id: 'ratify-plan',
+    order: 7,
+    name: 'RATIFY THE PLAN',
+    stationId: 'bureau',
+    durationMs: 1200,
+    windowMs: 7000,
+  }),
+  Object.freeze({
+    id: 'five-year-ferment',
+    order: 8,
+    name: 'FIVE-YEAR FERMENT',
+    stationId: 'still',
+    durationMs: 2100,
+    windowMs: 6500,
+  }),
+  Object.freeze({
+    id: 'commissars-blend',
+    order: 9,
+    name: "COMMISSAR'S BLEND",
+    stationId: 'vat',
+    durationMs: 1500,
+    windowMs: 7000,
+  }),
+  Object.freeze({
+    id: 'inspect-cadre',
+    order: 10,
+    name: 'INSPECT THE CADRE',
+    stationId: 'bureau',
+    durationMs: 1300,
+    windowMs: 6500,
+  }),
+  Object.freeze({
+    id: 'filter-line',
+    order: 11,
+    name: 'FILTER THE LINE',
+    stationId: 'filter',
+    durationMs: 1700,
+    windowMs: 6500,
+  }),
+  Object.freeze({
+    id: 'seal-revolution',
+    order: 12,
+    name: 'SEAL THE REVOLUTION',
+    stationId: 'press',
+    durationMs: 1400,
+    windowMs: 7000,
+  }),
 ]);
 
 export const DEFAULT_CONFIG = Object.freeze({
-  maxPotsPerBatch: 5,
-  bottlesPerPot: 20,
-  secondsPerBottle: 1,
-  recipe: DEFAULT_RECIPE,
+  stations: STATIONS,
+  processes: PROCESSES,
+  stationCapacity: 4,
+  bottlerCapacity: 4,
+  vialsPerPot: 20,
+  secondsPerVial: 1,
+  bottlingMs: 900,
 });
 
-export const PHASES = Object.freeze({
-  COLLECTING: 'collecting',
-  PROCESSING: 'processing',
-  MOVING: 'moving',
+export const POT_STATUS = Object.freeze({
+  IDLE: 'idle',
+  WORKING: 'working',
+  READY: 'ready',
   BOTTLING: 'bottling',
-  COMPLETE: 'complete',
-  FAILED: 'failed',
+  DONE: 'done',
+  SPOILED: 'spoiled',
 });
 
-function validateRecipe(recipe) {
-  if (!Array.isArray(recipe) || recipe.length < 1) {
-    throw new RangeError('recipe must contain at least one step');
+function clone(value) {
+  return value ? { ...value } : null;
+}
+
+function validateConfig(config) {
+  const stationIds = new Set();
+
+  if (!Array.isArray(config.stations) || config.stations.length < 1) {
+    throw new RangeError('stations must contain at least one station');
   }
 
-  const ids = new Set();
+  for (const station of config.stations) {
+    if (!station || typeof station.id !== 'string' || station.id.length === 0) {
+      throw new RangeError('every station needs a non-empty id');
+    }
+    if (stationIds.has(station.id)) {
+      throw new RangeError(`duplicate station: ${station.id}`);
+    }
+    stationIds.add(station.id);
+  }
 
-  for (const step of recipe) {
-    if (!step || typeof step.id !== 'string' || step.id.length === 0) {
-      throw new RangeError('every recipe step needs a non-empty id');
-    }
-    if (ids.has(step.id)) {
-      throw new RangeError(`duplicate recipe step: ${step.id}`);
-    }
-    ids.add(step.id);
+  if (!Array.isArray(config.processes) || config.processes.length < 1) {
+    throw new RangeError('processes must contain at least one process');
+  }
 
-    if (step.type === 'add') {
-      continue;
-    }
-    if (step.type === 'hold') {
-      if (!Number.isFinite(step.durationMs) || step.durationMs <= 0) {
-        throw new RangeError(`hold step ${step.id} needs a positive durationMs`);
-      }
-      continue;
-    }
+  const processIds = new Set();
+  const orders = new Set();
 
-    throw new RangeError(`recipe step ${step.id} has an unknown type`);
+  for (const process of config.processes) {
+    if (!process || typeof process.id !== 'string' || process.id.length === 0) {
+      throw new RangeError('every process needs a non-empty id');
+    }
+    if (processIds.has(process.id)) {
+      throw new RangeError(`duplicate process: ${process.id}`);
+    }
+    processIds.add(process.id);
+
+    if (!Number.isInteger(process.order) || process.order < 1) {
+      throw new RangeError(`process ${process.id} needs a positive integer order`);
+    }
+    if (orders.has(process.order)) {
+      throw new RangeError(`duplicate process order: ${process.order}`);
+    }
+    orders.add(process.order);
+
+    if (!stationIds.has(process.stationId)) {
+      throw new RangeError(`process ${process.id} uses an unknown station`);
+    }
+    if (!Number.isFinite(process.durationMs) || process.durationMs <= 0) {
+      throw new RangeError(`process ${process.id} needs a positive durationMs`);
+    }
+    if (!Number.isFinite(process.windowMs) || process.windowMs <= 0) {
+      throw new RangeError(`process ${process.id} needs a positive windowMs`);
+    }
+  }
+
+  for (const key of ['stationCapacity', 'bottlerCapacity', 'vialsPerPot']) {
+    if (!Number.isInteger(config[key]) || config[key] < 1) {
+      throw new RangeError(`${key} must be a positive integer`);
+    }
+  }
+
+  if (!Number.isFinite(config.secondsPerVial) || config.secondsPerVial <= 0) {
+    throw new RangeError('secondsPerVial must be positive');
+  }
+  if (!Number.isFinite(config.bottlingMs) || config.bottlingMs <= 0) {
+    throw new RangeError('bottlingMs must be positive');
   }
 }
 
 /**
- * Pure Dash Supplement Factory rules. The browser owns rendering, mouse input,
- * drag/drop, and the animation clock; it reports hold time with `advanceHold()`.
+ * Pure management rules for the Dash Supplement Factory.
  *
- * A batch is 1-5 pots. The player follows the recipe exactly, moves every pot
- * to bottling, then clicks the bottling machine once per pot. Each pot yields
- * 20 one-second bottles, so a full batch yields 100 seconds of dash.
+ * The player takes empty pots from an unlimited intake, drags each one into the
+ * station for its current numbered process, and moves it on before the ready
+ * window expires. Stations process four pots at once. After all twelve
+ * processes, a pot goes to the bottler and produces 20 one-second vials.
  *
- * Any action out of order wastes the whole batch. Its pending bottles are
- * discarded, every pot is marked wasted, and the player must call
- * `destroyBatch()` before starting another batch.
+ * The core has no DOM or wall clock. The host reports elapsed time with
+ * `advance(deltaMs)` and receives every completion, spoil, and bottling event.
  */
 export class DashSupplementFactory {
   constructor({ config = {} } = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+    validateConfig(this.config);
 
-    if (!Array.isArray(this.config.recipe) || this.config.recipe.length < 1) {
-      throw new RangeError('recipe must contain at least one step');
-    }
-
-    this.recipe = this.config.recipe.map((step) => ({ ...step }));
-    validateRecipe(this.recipe);
-
-    if (!Number.isInteger(this.config.maxPotsPerBatch) || this.config.maxPotsPerBatch < 1) {
-      throw new RangeError('maxPotsPerBatch must be a positive integer');
-    }
-    if (!Number.isInteger(this.config.bottlesPerPot) || this.config.bottlesPerPot < 1) {
-      throw new RangeError('bottlesPerPot must be a positive integer');
-    }
-    if (!Number.isFinite(this.config.secondsPerBottle) || this.config.secondsPerBottle <= 0) {
-      throw new RangeError('secondsPerBottle must be positive');
-    }
-
-    this.bottlesProduced = 0;
-    this.batchesCompleted = 0;
-    this.batchesFailed = 0;
-    this.lastBatch = null;
+    this.stations = this.config.stations.map((station) => ({ ...station }));
+    this.processes = this.config.processes
+      .map((process) => ({ ...process }))
+      .sort((a, b) => a.order - b.order);
 
     this._pots = [];
-    this._phase = PHASES.COLLECTING;
-    this._stepIndex = 0;
-    this._hold = null;
-    this._pendingBottles = 0;
-    this._failureReason = null;
     this._nextPotId = 1;
-  }
-
-  get phase() {
-    return this._phase;
-  }
-
-  get batchSize() {
-    return this._pots.length;
+    this._elapsedMs = 0;
+    this._vialsProduced = 0;
+    this._potsBottled = 0;
+    this._potsSpoiled = 0;
   }
 
   get pots() {
     return this._pots.map((pot) => ({ ...pot }));
   }
 
-  get currentStep() {
-    if (this._phase !== PHASES.PROCESSING) {
-      return null;
-    }
-    const step = this.recipe[this._stepIndex];
-    return step ? { ...step } : null;
+  get activePots() {
+    return this._pots
+      .filter((pot) => pot.location !== 'exited')
+      .map((pot) => ({ ...pot }));
   }
 
-  get stepIndex() {
-    return this._stepIndex;
+  get intakePots() {
+    return this.#potsAt('intake');
   }
 
-  get nextAction() {
-    switch (this._phase) {
-      case PHASES.COLLECTING:
-        return 'take-pots';
-      case PHASES.PROCESSING:
-        return this.currentStep?.id ?? null;
-      case PHASES.MOVING:
-        return 'move-pots';
-      case PHASES.BOTTLING:
-        return 'bottle';
-      case PHASES.COMPLETE:
-        return 'new-batch';
-      case PHASES.FAILED:
-        return 'destroy-batch';
-      default:
-        return null;
-    }
+  get elapsedMs() {
+    return this._elapsedMs;
   }
 
-  get canTakePot() {
-    return (
-      this._phase === PHASES.COLLECTING &&
-      this._pots.length < this.config.maxPotsPerBatch
-    );
-  }
-
-  get canStartBatch() {
-    return this._phase === PHASES.COLLECTING && this._pots.length > 0;
-  }
-
-  get hold() {
-    if (!this._hold) {
-      return null;
-    }
-
-    return {
-      ...this._hold,
-      progress: this._hold.elapsedMs / this._hold.requiredMs,
-    };
-  }
-
-  get holdProgress() {
-    return this._hold
-      ? Math.min(1, this._hold.elapsedMs / this._hold.requiredMs)
-      : 0;
-  }
-
-  get batchBottles() {
-    return this._pendingBottles;
-  }
-
-  get batchSeconds() {
-    return this._pendingBottles * this.config.secondsPerBottle;
+  get vialsProduced() {
+    return this._vialsProduced;
   }
 
   get secondsProduced() {
-    return this.bottlesProduced * this.config.secondsPerBottle;
+    return this._vialsProduced * this.config.secondsPerVial;
   }
 
-  get failureReason() {
-    return this._failureReason;
+  get potsBottled() {
+    return this._potsBottled;
   }
 
-  /** Add one pot while collecting. A completed batch starts a fresh one. */
+  get potsSpoiled() {
+    return this._potsSpoiled;
+  }
+
+  get stationCapacity() {
+    return this.config.stationCapacity;
+  }
+
+  get bottlerCapacity() {
+    return this.config.bottlerCapacity;
+  }
+
+  /** Active pots at one station, the intake, or the bottler. */
+  getPotsAt(location) {
+    return this.#potsAt(location);
+  }
+
+  /** Number of occupied slots per station, plus the bottler. */
+  get occupancy() {
+    const result = {};
+
+    for (const station of this.stations) {
+      result[station.id] = this.#potsAt(station.id).length;
+    }
+    result.bottler = this.#potsAt('bottler').length;
+
+    return result;
+  }
+
+  /** The process that is running or awaiting movement for a pot, if any. */
+  processFor(potId) {
+    const pot = this._pots.find((candidate) => candidate.id === potId);
+
+    if (!pot || pot.stepIndex >= this.processes.length) {
+      return null;
+    }
+    return clone(this.processes[pot.stepIndex]);
+  }
+
+  /** Add one empty pot to the intake. There is no limit. */
   takePot() {
-    if (this._phase === PHASES.FAILED) {
-      return this.#rejected('destroy-required');
-    }
-
-    if (this._phase === PHASES.COMPLETE) {
-      this.#resetBatch();
-    }
-
-    if (this._phase !== PHASES.COLLECTING) {
-      return this.#fail('wrong-order');
-    }
-
-    if (this._pots.length >= this.config.maxPotsPerBatch) {
-      return this.#rejected('batch-full');
-    }
-
     const pot = {
       id: this._nextPotId,
-      location: 'main',
+      stepIndex: 0,
+      location: 'intake',
+      status: POT_STATUS.IDLE,
+      progressMs: 0,
+      windowMsLeft: 0,
+      spoiled: false,
       bottled: false,
-      wasted: false,
     };
     this._nextPotId += 1;
     this._pots.push(pot);
@@ -226,418 +314,243 @@ export class DashSupplementFactory {
     return {
       type: 'pot-taken',
       potId: pot.id,
-      phase: this._phase,
-      batchSize: this._pots.length,
+      pot: { ...pot },
+      intake: this.#potsAt('intake').length,
     };
   }
 
-  /** Lock the batch without adding the first ingredient. */
-  startBatch() {
-    if (this._phase === PHASES.FAILED) {
-      return this.#rejected('destroy-required');
-    }
-    if (this._phase !== PHASES.COLLECTING) {
-      return this.#rejected('batch-active');
-    }
-    if (this._pots.length === 0) {
-      return this.#rejected('no-pots');
-    }
-
-    this._phase = PHASES.PROCESSING;
-    this._stepIndex = 0;
-
-    return {
-      type: 'batch-started',
-      phase: this._phase,
-      batchSize: this._pots.length,
-      step: this.currentStep,
-    };
-  }
-
-  /** Add an ingredient by recipe id. The first add step may start the batch. */
-  addIngredient(ingredientId) {
-    if (this._phase === PHASES.FAILED) {
-      return this.#rejected('destroy-required');
-    }
-    if (this._phase === PHASES.COMPLETE) {
-      return this.#rejected('batch-complete');
-    }
-    if (this._phase === PHASES.MOVING || this._phase === PHASES.BOTTLING) {
-      return this.#fail('wrong-order');
-    }
-
-    if (this._phase === PHASES.COLLECTING) {
-      if (this._pots.length === 0) {
-        return this.#rejected('no-pots');
-      }
-
-      const firstStep = this.recipe[0];
-
-      if (firstStep.type === 'add' && firstStep.id === ingredientId) {
-        this._phase = PHASES.PROCESSING;
-        this._stepIndex = 0;
-        return this.#consumeAddStep(ingredientId, { started: true });
-      }
-
-      if (this.#isRecipeAdd(ingredientId)) {
-        return this.#fail('wrong-order');
-      }
-      return this.#rejected('unknown-ingredient');
-    }
-
-    const step = this.currentStep;
-
-    if (!step || step.type !== 'add') {
-      return this.#fail('wrong-order');
-    }
-
-    if (step.id !== ingredientId) {
-      if (this.#isRecipeAdd(ingredientId)) {
-        return this.#fail('wrong-order');
-      }
-      return this.#rejected('unknown-ingredient');
-    }
-
-    return this.#consumeAddStep(ingredientId, { started: false });
-  }
-
-  /** Begin a stir/heat/filter hold for the current hold step. */
-  beginHold(stepId) {
-    if (this._phase === PHASES.FAILED) {
-      return this.#rejected('destroy-required');
-    }
-    if (this._phase === PHASES.COMPLETE) {
-      return this.#rejected('batch-complete');
-    }
-    if (this._hold) {
-      return this.#rejected('hold-active');
-    }
-    if (this._phase === PHASES.COLLECTING) {
-      return this._pots.length === 0
-        ? this.#rejected('no-pots')
-        : this.#fail('wrong-order');
-    }
-    if (this._phase !== PHASES.PROCESSING) {
-      return this.#fail('wrong-order');
-    }
-
-    const step = this.currentStep;
-
-    if (!step || step.type !== 'hold') {
-      return this.#fail('wrong-order');
-    }
-
-    if (step.id !== stepId) {
-      if (this.#isRecipeHold(stepId)) {
-        return this.#fail('wrong-order');
-      }
-      return this.#rejected('unknown-hold');
-    }
-
-    this._hold = {
-      stepId: step.id,
-      elapsedMs: 0,
-      requiredMs: step.durationMs,
-    };
-
-    return {
-      type: 'hold-started',
-      stepId: step.id,
-      requiredMs: step.durationMs,
-      progress: 0,
-      phase: this._phase,
-    };
-  }
-
-  /** Report how long the current hold has been held. */
-  advanceHold(deltaMs) {
-    if (!this._hold || !Number.isFinite(deltaMs) || deltaMs <= 0) {
-      return { type: 'noop' };
-    }
-
-    this._hold.elapsedMs = Math.min(
-      this._hold.requiredMs,
-      this._hold.elapsedMs + deltaMs,
-    );
-
-    if (this._hold.elapsedMs < this._hold.requiredMs) {
-      return {
-        type: 'hold-progress',
-        stepId: this._hold.stepId,
-        elapsedMs: this._hold.elapsedMs,
-        remainingMs: this._hold.requiredMs - this._hold.elapsedMs,
-        progress: this.holdProgress,
-        phase: this._phase,
-      };
-    }
-
-    const stepId = this._hold.stepId;
-    this._hold = null;
-    this._stepIndex += 1;
-    this.#advanceRecipe();
-
-    return {
-      type: 'hold-completed',
-      stepId,
-      phase: this._phase,
-      step: this.currentStep,
-    };
-  }
-
-  /** Release the hold. Releasing before the hold finishes wastes the batch. */
-  releaseHold() {
-    if (!this._hold) {
-      return { type: 'noop' };
-    }
-
-    if (this._hold.elapsedMs < this._hold.requiredMs) {
-      return this.#fail('released-early');
-    }
-
-    return { type: 'noop' };
-  }
-
-  /** Move one pot from the main station to the bottling station. */
-  movePot(potId) {
-    if (this._phase === PHASES.FAILED) {
-      return this.#rejected('destroy-required');
-    }
-    if (this._phase === PHASES.COMPLETE) {
-      return this.#rejected('batch-complete');
-    }
-    if (this._phase !== PHASES.MOVING) {
-      return this.#fail('wrong-order');
-    }
-
+  /**
+   * Drag a pot into a station or the bottler.
+   *
+   * A pot waiting at the intake or ready at a station can move. Working pots
+   * are rejected with `pot-busy`; a wrong station leaves the pot where it was.
+   */
+  dropPot(potId, targetId) {
     const pot = this._pots.find((candidate) => candidate.id === potId);
 
     if (!pot) {
       return this.#rejected('unknown-pot');
     }
-    if (pot.location !== 'main') {
-      return this.#rejected('pot-not-at-main');
+    if (pot.location === 'exited' || pot.status === POT_STATUS.SPOILED) {
+      return this.#rejected('pot-gone');
+    }
+    if (
+      pot.status === POT_STATUS.WORKING ||
+      pot.status === POT_STATUS.BOTTLING
+    ) {
+      return this.#rejected('pot-busy');
     }
 
-    pot.location = 'bottling';
-
-    if (this._pots.every((candidate) => candidate.location !== 'main')) {
-      this._phase = PHASES.BOTTLING;
+    if (targetId === 'bottler') {
+      return this.#dropAtBottler(pot);
     }
+
+    const station = this.stations.find((candidate) => candidate.id === targetId);
+
+    if (!station) {
+      return this.#rejected('unknown-station');
+    }
+    if (pot.location === targetId) {
+      return this.#rejected('already-there');
+    }
+
+    const step = this.processes[pot.stepIndex];
+
+    if (!step) {
+      return this.#rejected('ready-for-bottler');
+    }
+    if (step.stationId !== targetId) {
+      return this.#rejected('wrong-station', {
+        expectedStationId: step.stationId,
+        process: clone(step),
+      });
+    }
+    if (this.#potsAt(targetId).length >= this.config.stationCapacity) {
+      return this.#rejected('station-full');
+    }
+
+    const from = pot.location;
+    pot.location = targetId;
+    pot.status = POT_STATUS.WORKING;
+    pot.progressMs = 0;
+    pot.windowMsLeft = 0;
 
     return {
-      type: 'pot-moved',
-      potId,
-      phase: this._phase,
-      remaining: this._pots.filter((candidate) => candidate.location === 'main').length,
-    };
-  }
-
-  /** Convenience for click-to-move UIs: move the next pot still at main. */
-  moveNextPot() {
-    const pot = this._pots.find((candidate) => candidate.location === 'main');
-
-    if (!pot) {
-      if (this._phase === PHASES.FAILED) {
-        return this.#rejected('destroy-required');
-      }
-      if (this._phase === PHASES.COMPLETE) {
-        return this.#rejected('batch-complete');
-      }
-      if (this._phase !== PHASES.MOVING) {
-        return this.#fail('wrong-order');
-      }
-      return this.#rejected('no-pot');
-    }
-
-    return this.movePot(pot.id);
-  }
-
-  /** Bottle one pot at the bottling station. The last pot completes the batch. */
-  bottleNextPot() {
-    if (this._phase === PHASES.FAILED) {
-      return this.#rejected('destroy-required');
-    }
-    if (this._phase === PHASES.COMPLETE) {
-      return this.#rejected('batch-complete');
-    }
-    if (this._phase !== PHASES.BOTTLING) {
-      return this.#fail('wrong-order');
-    }
-
-    const pot = this._pots.find(
-      (candidate) => candidate.location === 'bottling' && !candidate.bottled,
-    );
-
-    if (!pot) {
-      return this.#rejected('no-pot');
-    }
-
-    pot.bottled = true;
-    pot.location = 'bottled';
-    this._pendingBottles += this.config.bottlesPerPot;
-
-    const remaining = this._pots.filter(
-      (candidate) => candidate.location === 'bottling' && !candidate.bottled,
-    ).length;
-
-    if (remaining === 0) {
-      return this.#completeBatch();
-    }
-
-    return {
-      type: 'bottled',
+      type: 'pot-dropped',
       potId: pot.id,
-      bottles: this.config.bottlesPerPot,
-      batchBottles: this._pendingBottles,
-      remaining,
-      complete: false,
-      phase: this._phase,
+      from,
+      to: targetId,
+      status: pot.status,
+      stepIndex: pot.stepIndex,
+      step: clone(step),
     };
   }
 
-  /** Clear a failed batch. Required before another batch can be started. */
-  destroyBatch() {
-    if (this._phase !== PHASES.FAILED) {
-      return this.#rejected('not-failed');
+  /**
+   * Advance every working, ready, and bottling pot by `deltaMs`.
+   *
+   * Returns a tick with an ordered `events` array. The array can contain
+   * process completions, spoiled pots, and bottled pots in the same tick.
+   */
+  advance(deltaMs) {
+    if (!Number.isFinite(deltaMs) || deltaMs <= 0) {
+      return this.#tick(0, []);
     }
 
-    this.#resetBatch();
+    this._elapsedMs += deltaMs;
+    const events = [];
 
-    return {
-      type: 'batch-destroyed',
-      phase: this._phase,
-    };
-  }
+    for (const pot of this._pots) {
+      if (pot.status === POT_STATUS.WORKING) {
+        const step = this.processes[pot.stepIndex];
 
-  /** Clear a completed batch and return to collecting. */
-  newBatch() {
-    if (this._phase === PHASES.FAILED) {
-      return this.#rejected('destroy-required');
+        if (!step) {
+          continue;
+        }
+
+        const completedIndex = pot.stepIndex;
+        pot.progressMs += deltaMs;
+
+        if (pot.progressMs >= step.durationMs) {
+          const overflow = pot.progressMs - step.durationMs;
+          pot.progressMs = step.durationMs;
+          pot.status = POT_STATUS.READY;
+          pot.windowMsLeft = step.windowMs;
+          pot.stepIndex += 1;
+          events.push({
+            type: 'process-complete',
+            potId: pot.id,
+            stationId: pot.location,
+            stepIndex: completedIndex,
+            step: clone(step),
+            nextStep: clone(this.processes[pot.stepIndex] ?? null),
+            windowMsLeft: pot.windowMsLeft,
+          });
+
+          if (overflow > 0) {
+            pot.windowMsLeft -= overflow;
+
+            if (pot.windowMsLeft <= 0) {
+              this.#spoil(pot, events, completedIndex);
+            }
+          }
+        }
+      } else if (pot.status === POT_STATUS.READY) {
+        pot.windowMsLeft -= deltaMs;
+
+        if (pot.windowMsLeft <= 0) {
+          this.#spoil(pot, events, Math.max(0, pot.stepIndex - 1));
+        }
+      } else if (pot.status === POT_STATUS.BOTTLING) {
+        pot.progressMs += deltaMs;
+
+        if (pot.progressMs >= this.config.bottlingMs) {
+          const vials = this.config.vialsPerPot;
+          pot.progressMs = this.config.bottlingMs;
+          pot.status = POT_STATUS.DONE;
+          pot.bottled = true;
+          pot.location = 'exited';
+          this._vialsProduced += vials;
+          this._potsBottled += 1;
+          events.push({
+            type: 'pot-bottled',
+            potId: pot.id,
+            vials,
+            seconds: vials * this.config.secondsPerVial,
+            vialsProduced: this._vialsProduced,
+            secondsProduced: this.secondsProduced,
+          });
+        }
+      }
     }
-    if (this._phase !== PHASES.COMPLETE) {
-      return this.#rejected('batch-active');
-    }
 
-    this.#resetBatch();
-
-    return {
-      type: 'new-batch',
-      phase: this._phase,
-    };
+    return this.#tick(deltaMs, events);
   }
 
-  /** Remove all produced bottles from the module and return the count. */
-  takeBottles() {
-    const bottles = this.bottlesProduced;
-    this.bottlesProduced = 0;
-    return bottles;
+  /** Remove all produced vials from the module and return the count. */
+  takeVials() {
+    const vials = this._vialsProduced;
+    this._vialsProduced = 0;
+    return vials;
   }
 
-  /** Remove all produced bottles and return their total speed duration. */
+  /** Remove all produced vials and return their total speed duration. */
   takeSeconds() {
-    return this.takeBottles() * this.config.secondsPerBottle;
+    return this.takeVials() * this.config.secondsPerVial;
   }
 
-  #consumeAddStep(ingredientId, { started }) {
-    const step = this.recipe[this._stepIndex];
-    this._stepIndex += 1;
-    this.#advanceRecipe();
-
-    return {
-      type: started ? 'batch-started' : 'ingredient-added',
-      ingredientId,
-      stepId: step.id,
-      phase: this._phase,
-      step: this.currentStep,
-      batchSize: this._pots.length,
-    };
+  /** Backwards-compatible aliases for hosts that still call them bottles. */
+  takeBottles() {
+    return this.takeVials();
   }
 
-  #advanceRecipe() {
-    if (this._stepIndex >= this.recipe.length) {
-      this._phase = PHASES.MOVING;
+  #dropAtBottler(pot) {
+    if (pot.stepIndex < this.processes.length) {
+      return this.#rejected('processes-remaining', {
+        process: clone(this.processes[pot.stepIndex]),
+      });
     }
-  }
-
-  #isRecipeAdd(ingredientId) {
-    return this.recipe.some((step) => step.type === 'add' && step.id === ingredientId);
-  }
-
-  #isRecipeHold(stepId) {
-    return this.recipe.some((step) => step.type === 'hold' && step.id === stepId);
-  }
-
-  #completeBatch() {
-    const bottles = this._pendingBottles;
-    this.bottlesProduced += bottles;
-    this.batchesCompleted += 1;
-    this._phase = PHASES.COMPLETE;
-    this.lastBatch = {
-      pots: this._pots.length,
-      bottles,
-      seconds: bottles * this.config.secondsPerBottle,
-      failed: false,
-      reason: null,
-    };
-
-    return {
-      type: 'batch-complete',
-      bottles,
-      seconds: bottles * this.config.secondsPerBottle,
-      bottlesProduced: this.bottlesProduced,
-      batchBottles: this._pendingBottles,
-      phase: this._phase,
-    };
-  }
-
-  #fail(reason) {
-    // Nothing to waste yet: a stray click before any pot is taken is rejected
-    // instead of creating an empty failed batch the player must destroy.
-    if (this._pots.length === 0) {
-      return this.#rejected('no-pots');
+    if (this.#potsAt('bottler').length >= this.config.bottlerCapacity) {
+      return this.#rejected('bottler-full');
     }
 
-    this._phase = PHASES.FAILED;
-    this._failureReason = reason;
-    this._hold = null;
-    this._pendingBottles = 0;
-    this._pots.forEach((pot) => {
-      pot.location = 'wasted';
-      pot.wasted = true;
-      pot.bottled = false;
+    const from = pot.location;
+    pot.location = 'bottler';
+    pot.status = POT_STATUS.BOTTLING;
+    pot.progressMs = 0;
+    pot.windowMsLeft = 0;
+
+    return {
+      type: 'pot-dropped',
+      potId: pot.id,
+      from,
+      to: 'bottler',
+      status: pot.status,
+      stepIndex: pot.stepIndex,
+      step: null,
+    };
+  }
+
+  #spoil(pot, events, stepIndex = pot.stepIndex) {
+    const stationId = pot.location;
+
+    pot.status = POT_STATUS.SPOILED;
+    pot.location = 'exited';
+    pot.spoiled = true;
+    pot.windowMsLeft = 0;
+    pot.progressMs = 0;
+    this._potsSpoiled += 1;
+    events.push({
+      type: 'pot-spoiled',
+      potId: pot.id,
+      stationId,
+      stepIndex,
+      reason: 'window',
     });
-    this.batchesFailed += 1;
-    this.lastBatch = {
-      pots: this._pots.length,
-      bottles: 0,
-      seconds: 0,
-      failed: true,
-      reason,
-    };
+  }
 
+  #potsAt(location) {
+    return this._pots
+      .filter((pot) => pot.location === location)
+      .map((pot) => ({ ...pot }));
+  }
+
+  #tick(deltaMs, events) {
     return {
-      type: 'batch-failed',
-      reason,
-      phase: this._phase,
-      batchSize: this._pots.length,
+      type: 'tick',
+      deltaMs,
+      elapsedMs: this._elapsedMs,
+      events,
+      activePots: this._pots.filter((pot) => pot.location !== 'exited').length,
+      vialsProduced: this._vialsProduced,
     };
   }
 
-  #rejected(reason) {
+  #rejected(reason, extra = {}) {
     return {
       type: 'rejected',
       reason,
-      phase: this._phase,
+      ...extra,
     };
-  }
-
-  #resetBatch() {
-    this._pots = [];
-    this._phase = PHASES.COLLECTING;
-    this._stepIndex = 0;
-    this._hold = null;
-    this._pendingBottles = 0;
-    this._failureReason = null;
-    this._nextPotId = 1;
   }
 }
