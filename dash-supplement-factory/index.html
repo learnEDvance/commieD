@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dash Supplement Factory — commieD</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="factory" id="factory">
+      <header class="stats">
+        <span class="stat">POTS <strong id="pots-stat">0 / 5</strong></span>
+        <span class="stat">STEP <strong id="step-stat">Take pots</strong></span>
+        <span class="stat">BATCH <strong id="batch-stat">0</strong></span>
+        <span class="stat">DASH <strong id="dash-stat">0s</strong></span>
+      </header>
+
+      <section class="recipe" aria-label="Batch order">
+        <p class="section-label">BATCH ORDER</p>
+        <ol id="recipe-list" class="recipe-list"></ol>
+      </section>
+
+      <section class="floor">
+        <section class="station station--main" aria-label="Main station">
+          <p class="section-label">MAIN STATION</p>
+          <div id="pot-rack" class="pot-rack"></div>
+          <div id="action-panel" class="action-panel" aria-label="Ingredients and holds"></div>
+          <button id="take-pot" class="take-pot" type="button">TAKE POT</button>
+        </section>
+
+        <div class="transfer" aria-hidden="true">
+          <span class="transfer__rail"></span>
+        </div>
+
+        <section class="station station--bottling" aria-label="Bottling station">
+          <p class="section-label">BOTTLING STATION</p>
+          <div id="bottling-rack" class="pot-rack pot-rack--bottling"></div>
+          <button id="machine" class="machine" type="button">
+            <span class="machine__label">BOTTLE</span>
+            <span id="machine-count" class="machine__count">0</span>
+          </button>
+          <div class="batch">
+            <div class="batch__bar">
+              <div id="batch-fill" class="batch__fill"></div>
+            </div>
+            <p id="batch-text" class="batch__text">0 bottles</p>
+          </div>
+        </section>
+      </section>
+
+      <p id="hint" class="hint" aria-live="polite">Take up to 5 pots.</p>
+    </main>
+
+    <div id="outcome" class="outcome" hidden>
+      <div class="outcome__card">
+        <h2 id="outcome-title" class="outcome__title">BATCH COMPLETE</h2>
+        <p id="outcome-detail" class="outcome__detail"></p>
+        <button id="outcome-action" class="outcome__action" type="button">NEW BATCH</button>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div id="fx-layer" class="fx-layer" aria-hidden="true"></div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

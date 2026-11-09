@@ -129,6 +129,10 @@ export class DashSupplementFactory {
     return step ? { ...step } : null;
   }
 
+  get stepIndex() {
+    return this._stepIndex;
+  }
+
   get nextAction() {
     switch (this._phase) {
       case PHASES.COLLECTING:

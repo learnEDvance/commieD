@@ -117,7 +117,7 @@ Open questions:
 
 Purpose: a clicky factory minigame that produces dash seconds.
 
-Implemented: `dash-supplement-factory/src/dashSupplementFactoryCore.js` (pure rules, no DOM or wall-clock) and `test/dashSupplementFactoryCore.test.js` (27 tests). Browser shell pending.
+Implemented: `dash-supplement-factory/src/dashSupplementFactoryCore.js` (pure rules, no DOM or wall-clock), `test/dashSupplementFactoryCore.test.js` (28 tests), and a browser shell in `dash-supplement-factory/` (`index.html`, `styles.css`, `src/main.js`, `src/assets.js`, `assets/bottle.svg`). Run it with `python3 -m http.server 8002` from the module folder.
 
 Source process:
 
@@ -160,15 +160,25 @@ Core interface:
 
 - Mutations: `takePot()`, `startBatch()`, `addIngredient(id)`, `beginHold(stepId)`, `advanceHold(deltaMs)`, `releaseHold()`, `movePot(potId)`, `moveNextPot()`, `bottleNextPot()`, `destroyBatch()`, `newBatch()`.
 - Output: `takeBottles()`, `takeSeconds()`.
-- State: `phase`, `batchSize`, `pots`, `currentStep`, `nextAction`, `canTakePot`, `canStartBatch`, `hold`, `holdProgress`, `batchBottles`, `batchSeconds`, `bottlesProduced`, `secondsProduced`, `failureReason`, `lastBatch`, `batchesCompleted`, `batchesFailed`.
+- State: `phase`, `batchSize`, `pots`, `currentStep`, `stepIndex`, `nextAction`, `canTakePot`, `canStartBatch`, `hold`, `holdProgress`, `batchBottles`, `batchSeconds`, `bottlesProduced`, `secondsProduced`, `failureReason`, `lastBatch`, `batchesCompleted`, `batchesFailed`.
 - Action results are plain events (`pot-taken`, `hold-progress`, `bottled`, `batch-failed`, `rejected`, and so on).
+
+Browser shell as built:
+
+- Main station on the left: five pot slots, `TAKE POT`, and one button per recipe step.
+- Bottling station on the right: arrived pots, the bottling machine, a batch bottle bar, and the running dash total.
+- Hold buttons fill while held; the pots simmer during a hold.
+- Clicking a pot moves it; a ghost pot flies across the transfer rail.
+- Bottling streams bottle sprites into the batch bar and pulses the machine.
+- Failure blurs the floor, stamps every pot `WASTED`, and asks for `DESTROY BATCH`.
+- Completion banks the bottles in a `BATCH COMPLETE` card with `NEW BATCH`.
+- Pot clicks outside the moving phase are harmless and `TAKE POT` is disabled when unusable; ingredient, hold, and machine clicks stay live so order mistakes remain possible.
 
 Open questions:
 
 - Confirm that each pot should yield 20 one-second bottles rather than a different split.
 - Tune the stir, heat, and filter hold durations.
 - Confirm whether the bottling machine should bottle one pot per click or all pots at once.
-- Decide whether bottled pots should be draggable, click-to-move, or both.
-- Define how a wasted batch is shown and how the destroy action is confirmed.
+- Decide whether bottled pots should stay click-to-move or gain drag-and-drop.
 - Decide whether the extra beet-extract and filter steps stay in the final game.
-- Add a browser shell, placeholder station/pot art, and host speed-resource integration.
+- Integrate `takeBottles()` / `takeSeconds()` with the host speed resource.

@@ -72,8 +72,12 @@ Tick only verified work. One small step at a time.
 - [x] Deterministic hold progress (`advanceHold`) with no wall-clock in the core
 - [x] Unit tests for happy path, wrong order, early release, partial bottling loss, destroy reset, output APIs
 - [x] Run instructions and core API documented in `dash-supplement-factory/README.md`
+- [x] Browser shell: main station, bottling station, recipe strip, hint line, stats
+- [x] Placeholder pot, machine, and bottle art with centralized asset paths
+- [x] Take-pot, ingredient, hold, click-to-move, and bottling-machine interactions
+- [x] Hold progress bars, simmering pots, pot transfer, bottle stream
+- [x] Wasted-batch and completed-batch outcome cards with destroy/new batch
+- [x] Browser smoke test: full five-pot batch, wrong order, early release, stray pot click
 - [ ] Tune hold durations through playtesting
-- [ ] Browser shell and dummy assets
-- [ ] Drag/take pot interactions and bottling machine UI
 - [ ] Integrate `takeBottles()` / `takeSeconds()` with the host speed resource
 - [ ] Replace placeholder art

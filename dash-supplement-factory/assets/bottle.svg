@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 40" role="img" aria-label="Dash bottle">
+  <rect x="5.5" y="1" width="5" height="7" rx="1.2" fill="#7a1f22"/>
+  <rect x="4.6" y="7" width="6.8" height="2.4" rx="1" fill="#3d4436"/>
+  <path d="M4.6 9.4h6.8l1.7 5.2V34a4 4 0 0 1-4 4H6.9a4 4 0 0 1-4-4V14.6z" fill="#f2c94c"/>
+  <path d="M2.9 21h10.2v13a4 4 0 0 1-4 4H6.9a4 4 0 0 1-4-4z" fill="#c4471f"/>
+  <rect x="3.4" y="22.6" width="9.2" height="4.4" fill="#f7e7b0"/>
+  <rect x="3.4" y="30" width="9.2" height="1.6" fill="#8f2f16"/>
+</svg>
