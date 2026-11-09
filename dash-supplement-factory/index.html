@@ -8,49 +8,64 @@
   </head>
   <body>
     <main class="factory" id="factory">
-      <header class="hud">
-        <div class="hud__brand">
-          <span id="hud-lamp" class="hud__lamp"></span>
-          <div>
-            <h1 class="hud__title">DASH SUPPLEMENT FACTORY</h1>
-            <p class="hud__sub">commieD · LINE 01 · GHOST SHIFT</p>
-          </div>
-        </div>
-        <div class="hud__stats">
-          <span class="stat">BATCH <strong id="batch-no">—</strong></span>
-          <span class="stat">POTS <strong id="pots-stat">0 / 5</strong></span>
-          <span class="stat">BOTTLES <strong id="batch-stat">0</strong></span>
-          <span class="stat">DASH <strong id="dash-stat">0s</strong></span>
-        </div>
-      </header>
+      <section class="floor" id="floor" aria-label="Factory floor">
+        <div class="floor__canvas" id="floor-canvas">
+          <div class="floor__grid" aria-hidden="true"></div>
+          <svg class="arrows" id="arrows" aria-hidden="true"></svg>
 
-      <section class="line" id="line" aria-label="Production line">
-        <div class="line__scroll" id="line-scroll">
-          <div class="line__belt" aria-hidden="true"></div>
-          <div class="stations" id="stations"></div>
-          <div class="tray" id="tray">
-            <span class="tray__tag" id="tray-tag">BATCH —</span>
-            <div class="tray__slots" id="tray-slots"></div>
-          </div>
+          <section class="intake" id="intake" aria-label="Empty pot intake">
+            <div class="intake__machine">
+              <span class="intake__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M4 4h16l-3 6H7L4 4Z" />
+                  <path d="M7 10v8h10v-8" />
+                  <path d="M9 18v3h6v-3" />
+                </svg>
+              </span>
+              <div class="intake__titles">
+                <span class="intake__eyebrow">COLLECTED TOP LEFT</span>
+                <h2 class="intake__title">EMPTY POTS</h2>
+              </div>
+              <span class="intake__lamp" aria-hidden="true"></span>
+            </div>
+            <div class="intake__rack is-empty" id="intake-rack"></div>
+            <button class="take-pot" id="take-pot" type="button">
+              <span>TAKE POT</span>
+              <strong id="empties-count">0</strong>
+            </button>
+          </section>
+
+          <div class="stations-layer" id="stations"></div>
+
+          <aside class="infopanel" id="infopanel" aria-label="Factory information">
+            <header class="infopanel__head">
+              <span class="infopanel__lamp" id="hud-lamp" aria-hidden="true"></span>
+              <div>
+                <h1 class="infopanel__title">DASH SUPPLEMENT FACTORY</h1>
+                <p class="infopanel__sub">commieD · GHOST SHIFT · FACTORY FLOOR</p>
+              </div>
+            </header>
+
+            <div class="infopanel__stats">
+              <span class="stat">IN PLAY <strong id="active-stat">0</strong></span>
+              <span class="stat">VIALS <strong id="vials-stat">0</strong></span>
+              <span class="stat">DASH <strong id="dash-stat">0s</strong></span>
+              <span class="stat stat--danger">SPOILED <strong id="spoiled-stat">0</strong></span>
+            </div>
+
+            <div class="infopanel__plan-head">
+              <span>PROCESS PLAN</span>
+              <span>01 → 12</span>
+            </div>
+            <div class="infopanel__plan" id="plan"></div>
+
+            <p class="hint" id="hint" aria-live="polite">
+              Take empty pots, then drag them into the grain mill.
+            </p>
+          </aside>
         </div>
       </section>
-
-      <footer class="deck">
-        <p id="hint" class="hint" aria-live="polite">
-          Take 1–5 pots onto the belt.
-        </p>
-      </footer>
     </main>
-
-    <div id="outcome" class="outcome" hidden>
-      <div class="outcome__card">
-        <h2 id="outcome-title" class="outcome__title">BATCH COMPLETE</h2>
-        <p id="outcome-detail" class="outcome__detail"></p>
-        <button id="outcome-action" class="outcome__action" type="button">
-          NEW BATCH
-        </button>
-      </div>
-    </div>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <div id="fx-layer" class="fx-layer" aria-hidden="true"></div>

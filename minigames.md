@@ -115,71 +115,82 @@ Open questions:
 
 ## 4. Dash Supplement Factory
 
-Purpose: a clicky factory minigame that produces dash seconds.
+Purpose: a station-management factory game that produces dash seconds.
 
-Implemented: `dash-supplement-factory/src/dashSupplementFactoryCore.js` (pure rules, no DOM or wall-clock), `test/dashSupplementFactoryCore.test.js` (28 tests), and a browser shell in `dash-supplement-factory/` (`index.html`, `styles.css`, `src/main.js`, `src/assets.js`, `assets/bottle.svg`). Run it with `python3 -m http.server 8002` from the module folder.
+Implemented: `dash-supplement-factory/src/dashSupplementFactoryCore.js` (pure rules, no DOM or wall-clock), `test/dashSupplementFactoryCore.test.js` (21 tests), and a browser shell in `dash-supplement-factory/` (`index.html`, `styles.css`, `src/main.js`, `src/assets.js`, `assets/bottle.svg`, `assets/vial.svg`). Run it with `python3 -m http.server 8002` from the module folder.
 
-Source process:
+Flow:
 
-1. Take a pot — maximum 5 pots in a batch.
-2. Add vodka.
-3. Hold to stir.
-4. Add national spirit.
-5. Heat by holding the mouse.
-6. Take the pot from the main station to the bottling station.
-7. Click the machine to bottle the potions.
+1. Take unlimited empty pots from the top-left intake.
+2. Drag each pot into the station for its current numbered process.
+3. The station processes automatically. Move the pot before its ready window expires.
+4. Repeat through twelve processes over six reusable stations.
+5. After process 12, drag the pot into the bottom-right bottler.
+6. Bottling produces 20 vials of one-second dash; vials leave right, emptied pots leave bottom.
 
-Default extended recipe (the source process plus two extra factory steps):
+Layout:
 
-1. Add vodka.
-2. Add beet extract.
-3. Hold to stir (`1800 ms`).
-4. Add national spirit.
-5. Hold to heat (`2200 ms`).
-6. Hold to filter (`1400 ms`).
+- Intake top left.
+- Six separate stations with 2×2 slot grids and machine protrusions: mill, vat, press, still, filter, bureau.
+- Bottler bottom right.
+- Info panel bottom left with title, live stats, the full numbered process plan, and the current hint.
+- Dynamic route arrows run from each pot's station to its next required station and are labelled with the process number.
 
-`BASE_RECIPE` keeps the shorter source process; `DEFAULT_RECIPE` is the extended version.
+Processes as implemented:
+
+| # | Process | Station | Work | Window |
+| --- | --- | --- | --- | --- |
+| 1 | Seize the Harvest | Mill | 1500 ms | 7000 ms |
+| 2 | Nationalize the Mash | Vat | 1400 ms | 7000 ms |
+| 3 | Agitate the Masses | Press | 1200 ms | 6500 ms |
+| 4 | Distill the Spirit | Still | 1900 ms | 6500 ms |
+| 5 | Collectivize the Vat | Vat | 1500 ms | 7000 ms |
+| 6 | Purge Deviations | Filter | 1400 ms | 6500 ms |
+| 7 | Ratify the Plan | Bureau | 1200 ms | 7000 ms |
+| 8 | Five-Year Ferment | Still | 2100 ms | 6500 ms |
+| 9 | Commissar's Blend | Vat | 1500 ms | 7000 ms |
+| 10 | Inspect the Cadre | Bureau | 1300 ms | 6500 ms |
+| 11 | Filter the Line | Filter | 1700 ms | 6500 ms |
+| 12 | Seal the Revolution | Press | 1400 ms | 7000 ms |
+
+The vat is used three times; the still, filter, bureau, and press twice; the mill once.
 
 Rules as implemented:
 
-- A batch holds 1–5 pots. Taking a sixth pot is rejected without failing the batch.
-- Adding the first ingredient locks the batch; no more pots can be taken.
-- The recipe must be followed exactly, in order.
-- Stirring, heating, and filtering are holds. The browser passes elapsed milliseconds to `advanceHold(deltaMs)`; the core never reads a clock.
-- Releasing a hold before it finishes wastes the batch.
-- After the recipe, the belt carries every pot to the bottler automatically.
-- The bottler is triggered once per batch and bottles one pot at a time; `bottleNextPot()` stays per pot in the core.
-- `1 pot = 20 bottles`; `1 bottle = 1 second` of speed. A full five-pot batch is 100 seconds.
-- Pending bottles are not committed until every pot in the batch is bottled.
-- Any order mistake wastes the **entire batch**: all pots are marked wasted, pending bottles are discarded, and no output is awarded.
-- A failed batch must be destroyed with `destroyBatch()` before another batch can start.
-- Taking a pot after a completed batch starts a new batch without discarding produced output.
-- The core is deterministic and replayable from the same action sequence.
+- The intake is unlimited.
+- Each station holds four pots in a 2×2 grid. A fifth drop is rejected and stays at its source.
+- A pot can only enter the station for its current process. Wrong-station drops are rejected without losing the pot.
+- Stations process automatically; a working pot cannot leave.
+- A finished process opens a ready window. If the window empties, the pot spoils, leaves the station, and frees its slot.
+- Process 12 must finish before the bottler accepts the pot.
+- The bottler holds four pots and bottles one pot every `900 ms`.
+- One pot produces 20 vials; one vial is one second of dash.
+- Vials are only awarded when bottling finishes.
+- The core is deterministic and replayable; the browser owns the clock and reports deltas.
 
 Core interface:
 
-- Mutations: `takePot()`, `startBatch()`, `addIngredient(id)`, `beginHold(stepId)`, `advanceHold(deltaMs)`, `releaseHold()`, `movePot(potId)`, `moveNextPot()`, `bottleNextPot()`, `destroyBatch()`, `newBatch()`.
-- Output: `takeBottles()`, `takeSeconds()`.
-- State: `phase`, `batchSize`, `pots`, `currentStep`, `stepIndex`, `nextAction`, `canTakePot`, `canStartBatch`, `hold`, `holdProgress`, `batchBottles`, `batchSeconds`, `bottlesProduced`, `secondsProduced`, `failureReason`, `lastBatch`, `batchesCompleted`, `batchesFailed`.
-- Action results are plain events (`pot-taken`, `hold-progress`, `bottled`, `batch-failed`, `rejected`, and so on).
+- Mutations: `takePot()`, `dropPot(potId, targetId)`, `advance(deltaMs)`.
+- Output: `takeVials()`, `takeSeconds()`, `takeBottles()` alias.
+- State: `processes`, `stations`, `pots`, `activePots`, `intakePots`, `occupancy`, `vialsProduced`, `secondsProduced`, `potsBottled`, `potsSpoiled`, `elapsedMs`, `stationCapacity`, `bottlerCapacity`.
+- `dropPot()` returns `pot-dropped` or `rejected` (`wrong-station`, `station-full`, `bottler-full`, `pot-busy`, `processes-remaining`, `pot-gone`).
+- `advance()` returns a tick with ordered `events` (`process-complete`, `pot-spoiled`, `pot-bottled`).
 
 Browser shell as built:
 
-- One-way conveyor with eight stations: pot hopper, vodka, beet extract, stir, national spirit, heat, filter, and bottler.
-- A batch tray rides the belt and stops at the glowing station; the belt animates during travel and the active station scrolls into view.
-- Ingredient and hold controls stay live at inactive stations, so order mistakes remain possible; take-pot and bottler actions are gated to their phases.
-- The batch number increments when the first pot is taken and appears on the tray and in the HUD.
-- Hold buttons fill while held; the pots simmer during a hold.
-- After the filter, the belt auto-carries the tray to the bottler and loads every pot.
-- `BOTTLE BATCH` runs the batch once, bottling one pot at a time with a crate progress bar and bottle stream.
-- Failure stamps the pots `WASTED` and asks for `DESTROY BATCH`; completion banks the bottles in a `BATCH COMPLETE` card with `NEW BATCH`.
-- Both reset actions fade the tray and return it to the hopper.
-- The pendant lamps, glowing station, and hint line teach the order without a separate tutorial.
+- Separate station cards, no belt. Each card has a machine protrusion and four slots.
+- Pointer drag-and-drop from the intake or a ready station to the next station or bottler.
+- Gold arrows show the next hop for ready pots; dashed arrows show the hop still processing.
+- The bottom-left panel shows title, IN PLAY / VIALS / DASH / SPOILED, all twelve numbered processes, and a live hint.
+- Pots show a process badge, fill level, work progress, and a ready-window timer.
+- Bottling streams vial sprites off the right edge; emptied pots fall off the bottom edge.
+- Wrong drops raise a toast; spoiled pots are removed and counted.
+- The line never ends or batches; play continues as long as the player takes pots.
 
 Open questions:
 
-- Confirm that each pot should yield 20 one-second bottles rather than a different split.
-- Tune the stir, heat, and filter hold durations.
-- Confirm the bottling run pace (one pot every ~470 ms) against the host's pacing.
-- Decide whether the extra beet-extract and filter steps stay in the final game.
-- Integrate `takeBottles()` / `takeSeconds()` with the host speed resource.
+- Confirm one pot should yield 20 one-second vials.
+- Tune the process durations and ready windows through playtesting.
+- Confirm wrong-station drops should be free rather than spoiling or delaying the pot.
+- Decide whether the six-station, twelve-process plan is the final route.
+- Integrate `takeVials()` / `takeSeconds()` with the host speed resource.

@@ -62,23 +62,21 @@ Tick only verified work. One small step at a time.
 
 ## Dash Supplement Factory
 
-- [x] Save the process and rules in `minigames.md`
-- [x] Confirm bottling math (1 pot = 20 bottles = 20 seconds)
-- [x] Define stir/heating/filter hold durations
-- [x] Extended recipe with beet extract and filter steps
-- [x] Pure core: collect pots, exact recipe order, holds, move, bottle, failure, destroy
-- [x] Bottles are only committed when the whole batch is bottled
-- [x] Failed batches discard pending bottles and must be destroyed
-- [x] Deterministic hold progress (`advanceHold`) with no wall-clock in the core
-- [x] Unit tests for happy path, wrong order, early release, partial bottling loss, destroy reset, output APIs
+- [x] Save the management rules, layout, and process plan in `minigames.md`
+- [x] Confirm bottling math (1 pot = 20 vials = 20 seconds)
+- [x] Define twelve numbered communist-themed processes over six reusable stations
+- [x] Pure core: unlimited intake, station drop validation, 4-slot capacity, automatic work, ready windows, spoilage, bottler, vials
+- [x] Deterministic `advance(deltaMs)` tick with process, spoil, and bottling events
+- [x] Unit tests for route order, station reuse, capacity, wrong drops, busy pots, spoilage, bottling, output APIs, determinism, validation
 - [x] Run instructions and core API documented in `dash-supplement-factory/README.md`
-- [x] Browser shell: eight-station conveyor, batch tray, pendant lamps, recipe hint line, stats
-- [x] Placeholder pot, machine, and bottle art with centralized asset paths
-- [x] Take-pot, ingredient, hold, auto-transfer, and per-batch bottling interactions
-- [x] Hold progress bars, simmering pots, tray travel, bottle stream
-- [x] Wasted-batch and completed-batch outcome cards with destroy/new batch
-- [x] Browser smoke test: full batch, auto-transfer, per-batch bottling, wrong order, early release
-- [ ] Tune hold durations through playtesting
-- [ ] Tune the bottling-run pace through playtesting
-- [ ] Integrate `takeBottles()` / `takeSeconds()` with the host speed resource
+- [x] Browser shell: separate station cards with 2×2 slots, machine protrusions, top-left intake, bottom-right bottler
+- [x] Bottom-left info panel: title, stats, full process plan, live hint
+- [x] Pointer drag-and-drop between stations with dynamic route arrows
+- [x] Pot work progress, ready-window timers, process badges, wrong-drop toasts
+- [x] Bottling FX: vials stream offscreen right, emptied pots fall offscreen bottom
+- [x] Placeholder pot, machine, bottle, and vial art with centralized asset paths
+- [x] Browser smoke test: layout, intake, drag, wrong station, full route, bottling, spoilage
+- [ ] Tune process durations and ready windows through playtesting
+- [ ] Confirm wrong-station drops should stay free
+- [ ] Integrate `takeVials()` / `takeSeconds()` with the host speed resource
 - [ ] Replace placeholder art
