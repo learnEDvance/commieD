@@ -119,6 +119,7 @@ export class Game {
     this.nextPlayerId = 1;
     this.nextProjectileId = 1;
     this.timeMs = 0;
+    this.winnerTeamId = null;
 
     if (autoJoin) {
       for (const team of this.teams) {
@@ -266,9 +267,42 @@ export class Game {
     return result;
   }
 
+  /**
+   * Host integration point for the ghost minigames.
+   * Soul Clicker sends HP, Bullet Press sends ammo, Dash Factory sends seconds.
+   * Values are additive, non-negative, and shared by the whole team.
+   */
+  contribute(teamId, resources = {}) {
+    const team = this.teams[teamId];
+    if (!team || team.eliminated) {
+      return { accepted: false, reason: 'eliminated' };
+    }
+
+    const hp = Number(resources.hp ?? 0);
+    const ammo = Number(resources.ammo ?? 0);
+    const dashSeconds = Number(resources.dashSeconds ?? 0);
+
+    for (const value of [hp, ammo, dashSeconds]) {
+      if (!Number.isFinite(value) || value < 0) {
+        throw new RangeError('contributions must be finite and non-negative');
+      }
+    }
+
+    if (hp === 0 && ammo === 0 && dashSeconds === 0) {
+      return { accepted: true, hp: 0, ammo: 0, dashSeconds: 0 };
+    }
+
+    team.hp += hp;
+    team.ammo += ammo;
+    team.dashSeconds += dashSeconds;
+
+    return { accepted: true, hp, ammo, dashSeconds };
+  }
+
   snapshot() {
     return {
       timeMs: this.timeMs,
+      winnerTeamId: this.winnerTeamId,
       teams: this.teams.map((team) => ({
         id: team.id,
         name: team.name,

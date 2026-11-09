@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>commieD — the maze remembers</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="stage" id="stage">
+      <canvas id="world" class="world"></canvas>
+
+      <section class="hud hud--minimap" aria-label="Minimap">
+        <header class="hud__head">
+          <span class="hud__title">SECTOR</span>
+          <span class="hud__mode" id="minimap-mode">NEARBY</span>
+        </header>
+        <canvas id="minimap" width="180" height="180"></canvas>
+      </section>
+
+      <section class="hud hud--stats" aria-label="Performance">
+        <span class="stat" data-stat="fps">FPS --</span>
+        <span class="stat" data-stat="frame">-- ms</span>
+        <span class="stat" data-stat="conn">LOCAL</span>
+        <span class="stat" data-stat="alive">-- / --</span>
+      </section>
+
+      <section class="hud hud--comrats" aria-label="Comrades">
+        <header class="hud__head">
+          <span class="hud__title">COMRATS</span>
+          <span class="hud__mode" id="comrats-count">0</span>
+        </header>
+        <ul class="comrats" id="comrats"></ul>
+      </section>
+
+      <section class="hud hud--reserves" aria-label="Team reserves">
+        <header class="hud__head">
+          <span class="hud__title">TEAM RESERVES</span>
+          <span class="hud__mode" id="team-name">VANGUARD</span>
+        </header>
+        <div class="reserve">
+          <span>AMMO</span>
+          <strong id="ammo">0</strong>
+        </div>
+        <div class="reserve">
+          <span>DASH</span>
+          <strong id="dash">0s</strong>
+        </div>
+        <div class="reserve">
+          <span>SPECIAL</span>
+          <strong id="special">—</strong>
+        </div>
+        <div class="special-queue" id="special-queue"></div>
+      </section>
+
+      <section class="hud hud--health" aria-label="Team health">
+        <header class="health__head">
+          <span id="health-team">VANGUARD</span>
+          <strong id="hp-label">0 / 0</strong>
+        </header>
+        <div class="health__bar">
+          <span class="health__fill" id="hp-fill"></span>
+        </div>
+        <footer class="health__foot">
+          <span id="effect-label">NO EFFECT</span>
+          <span id="status-label">LIVE</span>
+        </footer>
+      </section>
+
+      <section class="hud hud--controls" aria-label="Controls">
+        <span>WASD MOVE</span>
+        <span>MOUSE AIM / FIRE</span>
+        <span>SHIFT DASH</span>
+        <span>SPACE SPECIAL</span>
+        <span>X MINIMAP</span>
+        <span>1/2/3 GHOST TASK</span>
+        <span>R NEW MATCH</span>
+      </section>
+
+      <div class="toasts" id="toasts" aria-live="polite"></div>
+
+      <div class="banner" id="banner" hidden>
+        <strong id="banner-title">ELIMINATED</strong>
+        <span id="banner-text">Press R for a new match</span>
+      </div>
+    </main>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

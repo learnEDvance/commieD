@@ -49,9 +49,7 @@ Health regeneration rules
 - A broken magazine awards x0 and increments the broken count.
 - Finished magazines eject to the right and the next empty magazine enters from the left.
 - takeMagazines() returns whole magazines to the team.
-07 — stewedluck:
--on every kill by the live players, the team gets killmit. which can be used to spin a stew pot to get any special powerup in the game.(communist engineering)
-08-dash supplement factory
+07 --speed dash supplement factory:
 - A station-management factory game that produces dash seconds.
 - Take empty pots from the unlimited intake and drag them through twelve numbered processes over six reusable stations.
 - Each station holds four pots in a 2×2 grid and processes automatically; a pot must be moved before its ready window expires or it spoils and frees its slot.
