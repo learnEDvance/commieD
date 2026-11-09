@@ -6,6 +6,37 @@ const reduceMotion = window.matchMedia
   ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
   : false;
 
+const MAX_POTS = core.config.maxPotsPerBatch;
+const TRAY_TRAVEL_MS = reduceMotion ? 0 : 640;
+const BOTTLE_INTERVAL_MS = reduceMotion ? 90 : 470;
+const RESET_FADE_MS = reduceMotion ? 0 : 250;
+
+const SHORT_NAMES = {
+  vodka: 'VODKA',
+  'beet-extract': 'BEET EXTRACT',
+  'national-spirit': 'NAT. SPIRIT',
+  stir: 'STIR',
+  heat: 'HEAT',
+  filter: 'FILTER',
+};
+
+const LIQUID = {
+  vodka: '#dfe8f5',
+  'beet-extract': '#a42339',
+  'national-spirit': '#e0842f',
+};
+
+const MACHINE_PARTS = {
+  hopper: '<span class="machine__chute"></span><span class="machine__mouth"></span>',
+  dispenser: '<span class="machine__tank"></span><span class="machine__nozzle"></span>',
+  stir: '<span class="machine__vat"></span><span class="machine__paddle"></span>',
+  hold: '<span class="machine__vat"></span><span class="machine__paddle"></span>',
+  heat: '<span class="machine__burner"></span><span class="machine__flame"></span>',
+  filter: '<span class="machine__funnel"></span><span class="machine__mesh"></span>',
+  bottler:
+    '<span class="machine__press"></span><span class="machine__nozzle"></span><span class="machine__pots"></span>',
+};
+
 function byId(id) {
   const el = document.getElementById(id);
   if (!el) {
@@ -16,400 +47,766 @@ function byId(id) {
 
 const ui = {
   factory: byId('factory'),
+  hudLamp: byId('hud-lamp'),
+  batchNo: byId('batch-no'),
   potsStat: byId('pots-stat'),
-  stepStat: byId('step-stat'),
   batchStat: byId('batch-stat'),
   dashStat: byId('dash-stat'),
-  recipeList: byId('recipe-list'),
-  potRack: byId('pot-rack'),
-  bottlingRack: byId('bottling-rack'),
-  actionPanel: byId('action-panel'),
-  takePot: byId('take-pot'),
-  machine: byId('machine'),
-  machineCount: byId('machine-count'),
-  batchFill: byId('batch-fill'),
-  batchText: byId('batch-text'),
+  line: byId('line'),
+  stations: byId('stations'),
+  tray: byId('tray'),
+  trayTag: byId('tray-tag'),
+  traySlots: byId('tray-slots'),
+  hint: byId('hint'),
   outcome: byId('outcome'),
   outcomeTitle: byId('outcome-title'),
   outcomeDetail: byId('outcome-detail'),
   outcomeAction: byId('outcome-action'),
-  hint: byId('hint'),
   toast: byId('toast'),
   fx: byId('fx-layer'),
 };
 
-const LIQUID_STEPS = [
-  'transparent',
-  '#dfe8f5',
-  '#a42339',
-  '#c02a44',
-  '#e0842f',
-  '#f0a93a',
-  '#f2c94c',
-];
+const stationList = [];
+const stationEls = [];
+const controls = new Map();
 
-const recipeEls = [];
-const actionButtons = new Map();
-
-let activeHold = null;
+let currentBatchNo = 0;
+let trayStation = -1;
+let transferring = false;
+let transferTimer = null;
+let bottlingRun = null;
+let resetting = false;
+let hold = null;
 let toastTimer = null;
+let beltTimer = null;
 
-/* ---------- Recipe strip ---------- */
+/* ---------- Stations ---------- */
 
-function buildRecipe() {
-  core.recipe.forEach((step, index) => {
-    const li = document.createElement('li');
-    li.className = 'recipe-step';
-    li.dataset.stepId = step.id;
+function shortName(step) {
+  return SHORT_NAMES[step.id] ?? step.label.replace(/^Add\s+/i, '').toUpperCase();
+}
 
-    const number = document.createElement('span');
-    number.className = 'recipe-step__index';
-    number.textContent = String(index + 1);
+function stationKind(step) {
+  if (step.type === 'add') {
+    return 'dispenser';
+  }
+  return ['stir', 'heat', 'filter'].includes(step.id) ? step.id : 'hold';
+}
 
-    const label = document.createElement('span');
-    label.className = 'recipe-step__label';
-    label.textContent = step.label;
+function buildStationList() {
+  stationList.push({ id: 'hopper', kind: 'hopper', name: 'POT HOPPER' });
 
-    li.append(number, label);
+  core.recipe.forEach((step) => {
+    stationList.push({
+      id: step.id,
+      kind: stationKind(step),
+      name: shortName(step),
+      step,
+    });
+  });
 
-    if (step.type === 'hold') {
-      const time = document.createElement('span');
-      time.className = 'recipe-step__time';
-      time.textContent = `${(step.durationMs / 1000).toFixed(1)}s`;
-      li.append(time);
+  stationList.push({ id: 'bottler', kind: 'bottler', name: 'BOTTLER' });
+}
+
+function makeSpan(className, text) {
+  const el = document.createElement('span');
+  el.className = className;
+  if (text !== undefined) {
+    el.textContent = text;
+  }
+  return el;
+}
+
+function buildStations() {
+  ui.stations.style.setProperty('--station-count', String(stationList.length));
+
+  stationList.forEach((station, index) => {
+    const el = document.createElement('div');
+    el.className = 'station';
+    el.dataset.stationId = station.id;
+
+    const head = document.createElement('div');
+    head.className = 'station__head';
+
+    const machine = document.createElement('div');
+    machine.className = `machine machine--${station.kind}`;
+    if (station.step) {
+      machine.style.setProperty('--station-liquid', LIQUID[station.step.id] ?? '#f2c94c');
     }
+    machine.innerHTML = MACHINE_PARTS[station.kind] ?? '';
+    machine.prepend(
+      makeSpan('station__index', String(index + 1)),
+      makeSpan('machine__lamp'),
+    );
 
-    ui.recipeList.append(li);
-    recipeEls.push(li);
+    const name = makeSpan('station__name', station.name);
+    head.append(machine, name);
+
+    const controlsEl = document.createElement('div');
+    controlsEl.className = 'station__controls';
+
+    el.append(head, controlsEl);
+    el.prepend(makeSpan('station__pendant'));
+    ui.stations.append(el);
+
+    stationList[index].el = el;
+    stationEls.push(el);
+    buildControls(station, index, controlsEl);
   });
 }
 
-/* ---------- Action panel ---------- */
-
-function buildActions() {
-  core.recipe.forEach((step, index) => {
+function buildControls(station, index, host) {
+  if (station.id === 'hopper') {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = `action action--${step.type}`;
-    button.dataset.stepId = step.id;
-    button.dataset.stepIndex = String(index);
+    button.className = 'control control--take';
+    button.textContent = 'TAKE POT';
 
-    if (step.type === 'hold') {
-      const fill = document.createElement('span');
-      fill.className = 'action__fill';
+    const meta = makeSpan('control__meta', '1–5 POTS');
 
-      const label = document.createElement('span');
-      label.className = 'action__label';
-      label.textContent = step.label;
+    button.addEventListener('click', () => {
+      if (!canAct()) {
+        return;
+      }
+      const wasEmpty = core.batchSize === 0;
+      const event = core.takePot();
+      if (event.type === 'pot-taken' && wasEmpty) {
+        currentBatchNo += 1;
+      }
+      handle(event);
+    });
 
-      const time = document.createElement('span');
-      time.className = 'action__time';
-      time.textContent = `HOLD ${(step.durationMs / 1000).toFixed(1)}s`;
+    host.append(button, meta);
+    controls.set('hopper', { button, meta, kind: 'take' });
+    return;
+  }
 
-      button.append(fill, label, time);
-      button.addEventListener('pointerdown', (event) => {
-        if (event.button !== 0) {
-          return;
-        }
-        event.preventDefault();
-        startHold(step, button);
-      });
-    } else {
-      button.textContent = step.label;
-      button.addEventListener('click', () => {
-        handle(core.addIngredient(step.id));
-      });
+  if (station.step?.type === 'add') {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'control control--add';
+    button.textContent = `ADD ${shortName(station.step)}`;
+
+    const meta = makeSpan('control__meta', 'INGREDIENT');
+
+    button.addEventListener('click', () => {
+      if (!canAct()) {
+        return;
+      }
+      const event = core.addIngredient(station.step.id);
+      if (event.type === 'batch-started' || event.type === 'ingredient-added') {
+        drip(stationEls[index]);
+      }
+      handle(event);
+    });
+
+    host.append(button, meta);
+    controls.set(station.id, { button, meta, kind: 'add' });
+    return;
+  }
+
+  if (station.step?.type === 'hold') {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'control control--hold';
+    button.append(
+      makeSpan('control__fill'),
+      makeSpan('control__label', 'HOLD'),
+      makeSpan('control__meta', `${(station.step.durationMs / 1000).toFixed(1)}s`),
+    );
+
+    button.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0 || !canAct()) {
+        return;
+      }
+      event.preventDefault();
+      startHold(station, index, button);
+    });
+
+    host.append(button);
+    controls.set(station.id, { button, kind: 'hold' });
+    return;
+  }
+
+  if (station.id === 'bottler') {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'control control--bottle';
+    button.textContent = 'BOTTLER';
+    button.addEventListener('click', onBottle);
+
+    const meta = makeSpan('control__meta', 'WAITING');
+
+    const crate = document.createElement('div');
+    crate.className = 'crate';
+    const bar = document.createElement('div');
+    bar.className = 'crate__bar';
+    const fill = document.createElement('div');
+    fill.className = 'crate__fill';
+    bar.append(fill);
+    const text = document.createElement('p');
+    text.className = 'crate__text';
+    text.textContent = '0 BOTTLES';
+    crate.append(bar, text);
+
+    host.append(button, meta, crate);
+    controls.set('bottler', { button, meta, fill, text, kind: 'bottle' });
+  }
+}
+
+/* ---------- Tray ---------- */
+
+function fillPercent() {
+  if (core.phase === PHASES.COLLECTING) {
+    return 0;
+  }
+  return Math.min(1, core.stepIndex / core.recipe.length) * 100;
+}
+
+function liquidColor() {
+  for (let i = core.stepIndex - 1; i >= 0; i -= 1) {
+    const step = core.recipe[i];
+    if (step.type === 'add') {
+      return LIQUID[step.id] ?? '#f2c94c';
     }
+  }
+  return '#dfe8f5';
+}
 
-    ui.actionPanel.append(button);
-    actionButtons.set(step.id, button);
+function createMiniPot(pot) {
+  const el = document.createElement('div');
+  el.className = 'pot';
+  el.style.setProperty('--fill', `${Math.round(fillPercent())}%`);
+  el.style.setProperty('--liquid', liquidColor());
+
+  if (pot.wasted) {
+    el.classList.add('is-wasted');
+  }
+  if (core.phase === PHASES.PROCESSING) {
+    el.classList.add('is-working');
+  }
+
+  el.append(
+    makeSpan('pot__lid'),
+    (() => {
+      const body = makeSpan('pot__body');
+      body.append(makeSpan('pot__liquid'));
+      return body;
+    })(),
+  );
+  el.title = `Pot #${pot.id}`;
+  return el;
+}
+
+function renderTray() {
+  const visible = core.pots.filter(
+    (pot) => pot.location === 'main' || pot.location === 'wasted',
+  );
+
+  ui.traySlots.replaceChildren();
+
+  for (let i = 0; i < MAX_POTS; i += 1) {
+    const slot = document.createElement('div');
+    slot.className = 'tray__slot';
+    if (visible[i]) {
+      slot.append(createMiniPot(visible[i]));
+    }
+    ui.traySlots.append(slot);
+  }
+
+  ui.trayTag.textContent =
+    currentBatchNo > 0 ? `BATCH ${String(currentBatchNo).padStart(3, '0')}` : 'BATCH —';
+}
+
+function renderMachinePots() {
+  const host = document.querySelector('.machine--bottler .machine__pots');
+
+  if (!host) {
+    return;
+  }
+
+  host.replaceChildren();
+  const pots = core.pots.filter(
+    (pot) => pot.location === 'bottling' || pot.location === 'bottled',
+  );
+
+  pots.forEach((pot) => {
+    const dot = document.createElement('span');
+    dot.className = 'machine__pot';
+    if (pot.bottled) {
+      dot.classList.add('is-done');
+    }
+    host.append(dot);
+  });
+}
+
+function activeStationIndex() {
+  if (core.phase === PHASES.COLLECTING) {
+    return 0;
+  }
+  if (core.phase === PHASES.PROCESSING) {
+    return Math.min(core.stepIndex + 1, stationList.length - 1);
+  }
+  if (core.phase === PHASES.FAILED) {
+    return trayStation >= 0 ? trayStation : 0;
+  }
+  return stationList.length - 1;
+}
+
+function moveTrayToActive(instant = false) {
+  const active = activeStationIndex();
+  const station = stationEls[active];
+
+  if (!station) {
+    return;
+  }
+
+  if (!instant && active === trayStation && ui.tray.style.transform) {
+    return;
+  }
+
+  const center = station.offsetLeft + station.offsetWidth / 2;
+  const x = Math.round(center - ui.tray.offsetWidth / 2);
+
+  if (instant) {
+    ui.tray.classList.add('no-transition');
+    ui.tray.style.transform = `translate(${x}px, -50%)`;
+    void ui.tray.offsetWidth;
+    ui.tray.classList.remove('no-transition');
+  } else {
+    ui.tray.style.transform = `translate(${x}px, -50%)`;
+  }
+
+  if (!instant && trayStation !== -1 && trayStation !== active) {
+    animateBelt();
+    scrollStationIntoView(active);
+  }
+
+  trayStation = active;
+}
+
+function animateBelt() {
+  ui.line.classList.add('is-moving');
+  window.clearTimeout(beltTimer);
+  beltTimer = window.setTimeout(
+    () => ui.line.classList.remove('is-moving'),
+    TRAY_TRAVEL_MS + 80,
+  );
+}
+
+function scrollStationIntoView(index) {
+  const station = stationEls[index];
+
+  if (!station) {
+    return;
+  }
+
+  const target = station.offsetLeft + station.offsetWidth / 2 - ui.line.clientWidth / 2;
+
+  ui.line.scrollTo({
+    left: Math.max(0, target),
+    behavior: reduceMotion ? 'auto' : 'smooth',
   });
 }
 
 /* ---------- Holds ---------- */
 
-function setHoldFill(button, progress) {
+function setFill(button, progress) {
   button.style.setProperty('--hold', String(progress));
 }
 
-function startHold(step, button) {
-  if (activeHold) {
+function startHold(station, index, button) {
+  if (hold) {
     return;
   }
 
-  const event = core.beginHold(step.id);
+  const event = core.beginHold(station.step.id);
 
   if (event.type !== 'hold-started') {
     handle(event);
     return;
   }
 
-  activeHold = {
-    stepId: step.id,
+  hold = {
+    stepId: station.step.id,
     button,
+    stationEl: stationEls[index],
     lastMs: performance.now(),
     frame: 0,
   };
 
   button.classList.add('is-holding');
-  setHoldFill(button, 0);
+  setFill(button, 0);
   render();
-  activeHold.frame = window.requestAnimationFrame(holdFrame);
+  hold.frame = window.requestAnimationFrame(holdFrame);
 }
 
 function holdFrame(now) {
-  if (!activeHold) {
+  if (!hold) {
     return;
   }
 
-  const delta = Math.max(0, now - activeHold.lastMs);
-  activeHold.lastMs = now;
+  const delta = Math.max(0, now - hold.lastMs);
+  hold.lastMs = now;
 
   const event = core.advanceHold(delta);
-  setHoldFill(activeHold.button, core.holdProgress);
+  setFill(hold.button, core.holdProgress);
 
   if (event.type === 'hold-completed') {
-    stopHoldUi();
+    endHoldUi();
     handle(event);
     return;
   }
 
-  activeHold.frame = window.requestAnimationFrame(holdFrame);
+  hold.frame = window.requestAnimationFrame(holdFrame);
 }
 
-function stopHoldUi() {
-  if (!activeHold) {
+function endHoldUi() {
+  if (!hold) {
     return;
   }
 
-  window.cancelAnimationFrame(activeHold.frame);
-  activeHold.button.classList.remove('is-holding');
-  activeHold = null;
+  window.cancelAnimationFrame(hold.frame);
+  hold.button.classList.remove('is-holding');
+  hold.stationEl.classList.remove('is-working');
+  hold = null;
 }
 
 function endHold() {
-  if (!activeHold) {
+  if (!hold) {
     return;
   }
 
-  const button = activeHold.button;
-  stopHoldUi();
-  setHoldFill(button, 0);
-
-  const event = core.releaseHold();
-  handle(event);
+  const button = hold.button;
+  endHoldUi();
+  setFill(button, 0);
+  handle(core.releaseHold());
 }
 
 window.addEventListener('pointerup', endHold);
 window.addEventListener('pointercancel', endHold);
 window.addEventListener('blur', endHold);
 
-/* ---------- Pots ---------- */
+/* ---------- Batch actions ---------- */
 
-function potFill() {
-  if (core.phase === PHASES.COLLECTING) {
-    return 0;
-  }
-  return Math.min(1, core.stepIndex / core.recipe.length);
+function canAct() {
+  return !bottlingRun && !transferring && !resetting;
 }
 
-function potLiquid() {
-  if (core.phase === PHASES.COLLECTING) {
-    return 'transparent';
-  }
-  return LIQUID_STEPS[Math.min(core.stepIndex, LIQUID_STEPS.length - 1)];
+function drip(stationEl) {
+  stationEl.classList.remove('is-dripping');
+  void stationEl.offsetWidth;
+  stationEl.classList.add('is-dripping');
+  window.setTimeout(() => stationEl.classList.remove('is-dripping'), 320);
 }
 
-function createPot(pot) {
-  const el = document.createElement('div');
-  el.className = 'pot';
-  el.dataset.potId = String(pot.id);
-  el.style.setProperty('--fill', `${Math.round(potFill() * 100)}%`);
-  el.style.setProperty('--liquid', potLiquid());
-
-  if (pot.wasted) {
-    el.classList.add('is-wasted');
-  }
-  if (pot.bottled) {
-    el.classList.add('is-bottled');
-  }
-  if (core.phase === PHASES.PROCESSING) {
-    el.classList.add('is-processing');
-    if (activeHold) {
-      el.classList.add('is-working');
-    }
-  }
-  if (core.phase === PHASES.MOVING) {
-    el.classList.add('is-movable');
-  }
-
-  const lid = document.createElement('span');
-  lid.className = 'pot__lid';
-
-  const body = document.createElement('span');
-  body.className = 'pot__body';
-
-  const liquid = document.createElement('span');
-  liquid.className = 'pot__liquid';
-  body.append(liquid);
-
-  const label = document.createElement('span');
-  label.className = 'pot__label';
-  label.textContent = `#${pot.id}`;
-
-  el.append(lid, body, label);
-  el.title = `Pot #${pot.id}`;
-  el.addEventListener('click', () => onPotClick(pot.id, el));
-
-  return el;
-}
-
-function createPotSlot() {
-  const el = document.createElement('div');
-  el.className = 'pot-slot';
-  el.setAttribute('aria-hidden', 'true');
-  return el;
-}
-
-function renderPots() {
-  const pots = core.pots;
-
-  ui.potRack.replaceChildren();
-  ui.bottlingRack.replaceChildren();
-
-  for (const pot of pots) {
-    const el = createPot(pot);
-
-    if (pot.location === 'main' || pot.location === 'wasted') {
-      ui.potRack.append(el);
-    } else {
-      ui.bottlingRack.append(el);
-    }
-  }
-
-  if (core.phase === PHASES.COLLECTING) {
-    const taken = pots.length;
-
-    for (let i = taken; i < core.config.maxPotsPerBatch; i += 1) {
-      ui.potRack.append(createPotSlot());
-    }
-
-    ui.potRack.classList.add('is-collecting');
-  } else {
-    ui.potRack.classList.remove('is-collecting');
-  }
-
-  const waiting = pots.filter(
+function remainingBottlingPots() {
+  return core.pots.filter(
     (pot) => pot.location === 'bottling' && !pot.bottled,
   ).length;
+}
 
-  ui.bottlingRack.classList.toggle('is-empty', waiting === 0);
+function onBottle() {
+  if (core.phase !== PHASES.BOTTLING || bottlingRun || !canAct()) {
+    return;
+  }
 
-  if (core.phase === PHASES.MOVING) {
-    ui.potRack.classList.add('is-movable');
-  } else {
-    ui.potRack.classList.remove('is-movable');
+  bottlingRun = { timer: 0 };
+  render();
+  bottlingRun.timer = window.setTimeout(
+    runBottleStep,
+    reduceMotion ? 0 : 180,
+  );
+}
+
+function runBottleStep() {
+  const event = core.bottleNextPot();
+
+  if (event.type === 'bottled') {
+    pulseStation('bottler');
+    handle(event);
+    bottlingRun.timer = window.setTimeout(runBottleStep, BOTTLE_INTERVAL_MS);
+    return;
+  }
+
+  bottlingRun = null;
+  handle(event);
+
+  if (event.type === 'batch-complete') {
+    streamBottles(9);
   }
 }
 
-function onPotClick(potId, el) {
-  if (core.phase !== PHASES.MOVING) {
-    el.classList.remove('is-nudge');
-    void el.offsetWidth;
-    el.classList.add('is-nudge');
+function pulseStation(id) {
+  const station = stationList.find((candidate) => candidate.id === id);
+
+  if (!station?.el) {
     return;
   }
 
-  const fromRect = el.getBoundingClientRect();
-  const event = core.movePot(potId);
+  station.el.classList.remove('is-pumping');
+  void station.el.offsetWidth;
+  station.el.classList.add('is-pumping');
+  window.setTimeout(() => station.el.classList.remove('is-pumping'), 340);
+}
 
-  if (event.type !== 'pot-moved') {
-    handle(event);
+function maybeTransfer() {
+  if (core.phase !== PHASES.MOVING || transferring) {
     return;
   }
 
-  render();
+  transferring = true;
+  window.clearTimeout(transferTimer);
+  transferTimer = window.setTimeout(
+    () => {
+      while (core.phase === PHASES.MOVING) {
+        const event = core.moveNextPot();
+        if (event.type !== 'pot-moved') {
+          break;
+        }
+      }
+      transferring = false;
+      render();
+    },
+    TRAY_TRAVEL_MS + 80,
+  );
+}
 
-  const target = ui.bottlingRack.querySelector(`[data-pot-id="${potId}"]`);
+/* ---------- Render ---------- */
 
-  if (!target || reduceMotion) {
-    return;
+function recipeDone(recipeIndex) {
+  if (core.phase === PHASES.PROCESSING) {
+    return recipeIndex < core.stepIndex;
   }
+  return (
+    core.phase === PHASES.MOVING ||
+    core.phase === PHASES.BOTTLING ||
+    core.phase === PHASES.COMPLETE
+  );
+}
 
-  target.style.visibility = 'hidden';
-  flyPot(fromRect, target.getBoundingClientRect(), () => {
-    target.style.visibility = '';
+function renderHud() {
+  ui.batchNo.textContent =
+    currentBatchNo > 0 ? String(currentBatchNo).padStart(3, '0') : '—';
+  ui.potsStat.textContent = `${core.batchSize} / ${MAX_POTS}`;
+  ui.batchStat.textContent = String(core.batchBottles);
+  ui.dashStat.textContent = `${core.secondsProduced}s`;
+
+  const running =
+    core.phase === PHASES.PROCESSING ||
+    core.phase === PHASES.MOVING ||
+    core.phase === PHASES.BOTTLING;
+
+  ui.hudLamp.classList.toggle('is-run', running);
+  ui.hudLamp.classList.toggle('is-alarm', core.phase === PHASES.FAILED);
+}
+
+function renderStations() {
+  const active = activeStationIndex();
+
+  stationList.forEach((station, index) => {
+    const el = station.el;
+    const isRecipe = Boolean(station.step);
+    const done = isRecipe ? recipeDone(index - 1) : false;
+    const failedHere = core.phase === PHASES.FAILED && index === active;
+
+    el.classList.toggle('is-active', index === active);
+    el.classList.toggle('is-done', done);
+    el.classList.toggle('is-failed', failedHere);
+    el.classList.toggle(
+      'is-working',
+      Boolean(hold) && hold.stepId === station.id,
+    );
+
+    const control = controls.get(station.id);
+
+    if (!control) {
+      return;
+    }
+
+    if (control.kind === 'take') {
+      control.button.disabled = !core.canTakePot || !canAct();
+      control.meta.textContent = `${core.batchSize} / ${MAX_POTS} POTS`;
+      return;
+    }
+
+    if (control.kind === 'add') {
+      control.button.disabled = !canAct();
+      return;
+    }
+
+    if (control.kind === 'hold') {
+      control.button.disabled = !canAct();
+
+      if (done) {
+        setFill(control.button, 1);
+      } else if (!hold || hold.stepId !== station.id) {
+        setFill(control.button, 0);
+      }
+      return;
+    }
+
+    if (control.kind === 'bottle') {
+      const bottling = core.phase === PHASES.BOTTLING;
+      const running = Boolean(bottlingRun);
+      const moving = core.phase === PHASES.MOVING;
+      const left = remainingBottlingPots();
+
+      control.button.disabled = !bottling || running || !canAct();
+      control.button.textContent = running
+        ? 'BOTTLING…'
+        : bottling
+          ? 'BOTTLE BATCH'
+          : 'BOTTLER';
+      control.meta.textContent = running || bottling
+        ? `${left} ${left === 1 ? 'POT' : 'POTS'} · ${left * core.config.bottlesPerPot * core.config.secondsPerBottle}s`
+        : moving
+          ? 'LOADING POTS…'
+          : 'WAITING';
+
+      const capacity = core.batchSize * core.config.bottlesPerPot;
+      const percent = capacity
+        ? Math.min(100, (core.batchBottles / capacity) * 100)
+        : 0;
+      control.fill.style.width = `${percent}%`;
+      control.text.textContent = capacity
+        ? `${core.batchBottles} / ${capacity} BOTTLES`
+        : '0 BOTTLES';
+    }
   });
+}
+
+function renderHint() {
+  const step = core.currentStep;
+
+  switch (core.phase) {
+    case PHASES.COLLECTING:
+      ui.hint.textContent =
+        core.batchSize === 0
+          ? 'Take 1–5 pots onto the belt.'
+          : 'Start the batch at the vodka dispenser — or load more pots first.';
+      break;
+    case PHASES.PROCESSING:
+      ui.hint.textContent =
+        step?.type === 'hold'
+          ? `${step.label} at station ${core.stepIndex + 2} — hold until the gauge fills.`
+          : `${step?.label ?? 'Add the ingredient'} at station ${core.stepIndex + 2}.`;
+      break;
+    case PHASES.MOVING:
+      ui.hint.textContent = 'The belt is carrying the batch to the bottler.';
+      break;
+    case PHASES.BOTTLING:
+      ui.hint.textContent = bottlingRun
+        ? 'The bottler is filling the crate.'
+        : 'Run the bottler to fill the crate.';
+      break;
+    case PHASES.COMPLETE:
+      ui.hint.textContent = 'Batch banked. Start a new batch.';
+      break;
+    case PHASES.FAILED:
+      ui.hint.textContent = 'The batch is ruined. Destroy it to clear the line.';
+      break;
+    default:
+      ui.hint.textContent = '';
+  }
+}
+
+function batchLabel() {
+  return currentBatchNo > 0
+    ? String(currentBatchNo).padStart(3, '0')
+    : '—';
+}
+
+function failureText(reason) {
+  switch (reason) {
+    case 'wrong-order':
+      return 'Out of order. Every pot in this batch is ruined.';
+    case 'released-early':
+      return 'The hold was released too soon. Every pot in this batch is ruined.';
+    default:
+      return 'The batch is ruined and must be destroyed.';
+  }
+}
+
+function renderOutcome() {
+  if (core.phase === PHASES.FAILED) {
+    ui.outcome.hidden = false;
+    ui.outcome.dataset.state = 'failed';
+    ui.outcomeTitle.textContent = `BATCH ${batchLabel()} WASTED`;
+    ui.outcomeDetail.textContent = failureText(core.failureReason);
+    ui.outcomeAction.textContent = 'DESTROY BATCH';
+    ui.outcomeAction.dataset.action = 'destroy';
+    return;
+  }
+
+  if (core.phase === PHASES.COMPLETE) {
+    const batch = core.lastBatch;
+
+    ui.outcome.hidden = false;
+    ui.outcome.dataset.state = 'complete';
+    ui.outcomeTitle.textContent = `BATCH ${batchLabel()} COMPLETE`;
+    ui.outcomeDetail.textContent = batch
+      ? `${batch.pots} pots → ${batch.bottles} bottles → ${batch.seconds} seconds of dash.`
+      : 'Bottles banked.';
+    ui.outcomeAction.textContent = 'NEW BATCH';
+    ui.outcomeAction.dataset.action = 'new';
+    return;
+  }
+
+  ui.outcome.hidden = true;
+}
+
+function render() {
+  renderHud();
+  renderStations();
+  renderTray();
+  renderMachinePots();
+  renderOutcome();
+  renderHint();
+  moveTrayToActive();
+  maybeTransfer();
 }
 
 /* ---------- FX ---------- */
 
-function flyPot(fromRect, toRect, done) {
-  const ghost = document.createElement('div');
-  ghost.className = 'pot pot--ghost';
-  ghost.style.width = `${fromRect.width}px`;
-  ghost.style.height = `${fromRect.height}px`;
-  ghost.style.left = `${fromRect.left}px`;
-  ghost.style.top = `${fromRect.top}px`;
-  ghost.style.setProperty('--fill', `${Math.round(potFill() * 100)}%`);
-  ghost.style.setProperty('--liquid', potLiquid());
-
-  ghost.innerHTML =
-    '<span class="pot__lid"></span><span class="pot__body"><span class="pot__liquid"></span></span>';
-
-  ui.fx.append(ghost);
-
-  const dx =
-    toRect.left + toRect.width / 2 - (fromRect.left + fromRect.width / 2);
-  const dy = toRect.top + toRect.height / 2 - (fromRect.top + fromRect.height / 2);
-  const scale = Math.min(1, toRect.width / Math.max(1, fromRect.width));
-
-  const animation = ghost.animate(
-    [
-      { transform: 'translate(0, 0) scale(1)', opacity: 1 },
-      { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 0.85 },
-    ],
-    { duration: 340, easing: 'cubic-bezier(.35, 0, .2, 1)' },
-  );
-
-  const finish = () => {
-    ghost.remove();
-    done?.();
-  };
-
-  animation.finished.then(finish).catch(finish);
-}
-
-function streamBottles(count = 5) {
+function streamBottles(count) {
   if (reduceMotion) {
     return;
   }
 
-  const from = ui.machine.getBoundingClientRect();
-  const to = ui.batchFill.getBoundingClientRect();
+  const nozzle = document.querySelector('.machine--bottler .machine__nozzle');
+  const target = controls.get('bottler')?.fill;
+
+  if (!nozzle || !target) {
+    return;
+  }
+
+  const from = nozzle.getBoundingClientRect();
+  const to = target.getBoundingClientRect();
 
   for (let i = 0; i < count; i += 1) {
     const bottle = document.createElement('img');
     bottle.src = ASSETS.bottle;
     bottle.alt = '';
     bottle.className = 'fx-bottle';
-    bottle.style.left = `${from.left + from.width / 2 - 6}px`;
-    bottle.style.top = `${from.top + from.height / 2 - 15}px`;
+    bottle.style.left = `${from.left + from.width / 2 - 5}px`;
+    bottle.style.top = `${from.top + from.height}px`;
     ui.fx.append(bottle);
 
     const dx =
-      to.left + to.width * (0.35 + Math.random() * 0.6) -
+      to.left +
+      to.width * (0.3 + Math.random() * 0.7) -
       (from.left + from.width / 2);
-    const dy = to.top + to.height / 2 - (from.top + from.height / 2);
+    const dy = to.top + to.height / 2 - (from.top + from.height);
 
     const animation = bottle.animate(
       [
         { transform: 'translate(0, 0) scale(1)', opacity: 1 },
-        { transform: `translate(${dx}px, ${dy}px) scale(.6)`, opacity: 0 },
+        { transform: `translate(${dx}px, ${dy}px) scale(.65)`, opacity: 0 },
       ],
       {
-        duration: 420,
-        delay: i * 45,
+        duration: 520,
+        delay: i * 50,
         easing: 'ease-in',
         fill: 'backwards',
       },
@@ -435,204 +832,12 @@ function toast(message) {
   }, 1600);
 }
 
-/* ---------- Render ---------- */
-
-function renderStats() {
-  ui.potsStat.textContent = `${core.batchSize} / ${core.config.maxPotsPerBatch}`;
-  ui.batchStat.textContent = String(core.batchBottles);
-  ui.dashStat.textContent = `${core.secondsProduced}s`;
-
-  switch (core.phase) {
-    case PHASES.COLLECTING:
-      ui.stepStat.textContent = 'Take pots';
-      break;
-    case PHASES.PROCESSING:
-      ui.stepStat.textContent = core.currentStep?.label ?? 'Process';
-      break;
-    case PHASES.MOVING:
-      ui.stepStat.textContent = 'Move pots';
-      break;
-    case PHASES.BOTTLING:
-      ui.stepStat.textContent = 'Bottle';
-      break;
-    case PHASES.COMPLETE:
-      ui.stepStat.textContent = 'Complete';
-      break;
-    case PHASES.FAILED:
-      ui.stepStat.textContent = 'Wasted';
-      break;
-    default:
-      ui.stepStat.textContent = '—';
-  }
-}
-
-function renderRecipe() {
-  const processing = core.phase === PHASES.PROCESSING;
-  const failed = core.phase === PHASES.FAILED;
-  const finished =
-    core.phase === PHASES.MOVING ||
-    core.phase === PHASES.BOTTLING ||
-    core.phase === PHASES.COMPLETE;
-
-  recipeEls.forEach((el, index) => {
-    const done = finished || (processing && index < core.stepIndex);
-    const current = processing && index === core.stepIndex;
-
-    el.classList.toggle('is-done', done);
-    el.classList.toggle('is-current', current);
-    el.classList.toggle('is-next', current);
-    el.classList.toggle('is-failed', failed);
-  });
-}
-
-function renderActions() {
-  const processing = core.phase === PHASES.PROCESSING;
-  const collecting = core.phase === PHASES.COLLECTING;
-
-  for (const [stepId, button] of actionButtons) {
-    const index = Number(button.dataset.stepIndex);
-    const step = core.recipe[index];
-
-    button.classList.toggle(
-      'is-next',
-      (processing && core.currentStep?.id === stepId) ||
-        (collecting && core.batchSize > 0 && index === 0),
-    );
-
-    const done =
-      (processing && index < core.stepIndex) ||
-      core.phase === PHASES.MOVING ||
-      core.phase === PHASES.BOTTLING ||
-      core.phase === PHASES.COMPLETE;
-
-    button.classList.toggle('is-done', done);
-
-    if (step.type === 'hold') {
-      if (done) {
-        setHoldFill(button, 1);
-      } else if (!activeHold || activeHold.stepId !== stepId) {
-        setHoldFill(button, 0);
-      }
-    }
-  }
-
-  ui.takePot.disabled = !core.canTakePot;
-  ui.takePot.classList.toggle('is-next', collecting);
-}
-
-function renderMachine() {
-  ui.machineCount.textContent = String(core.batchBottles);
-  ui.machine.classList.toggle('is-ready', core.phase === PHASES.BOTTLING);
-  ui.machine.disabled = core.batchSize === 0;
-}
-
-function renderBatchBar() {
-  const capacity = core.batchSize * core.config.bottlesPerPot;
-
-  if (capacity === 0) {
-    ui.batchFill.style.width = '0%';
-    ui.batchText.textContent = '0 bottles';
-    return;
-  }
-
-  const percent = Math.min(100, (core.batchBottles / capacity) * 100);
-  ui.batchFill.style.width = `${percent}%`;
-  ui.batchText.textContent = `${core.batchBottles} / ${capacity} bottles`;
-}
-
-function failureText(reason) {
-  switch (reason) {
-    case 'wrong-order':
-      return 'Out of order. Every pot in this batch is ruined.';
-    case 'released-early':
-      return 'You let go too soon. Every pot in this batch is ruined.';
-    default:
-      return 'The batch is ruined and must be destroyed.';
-  }
-}
-
-function renderOutcome() {
-  if (core.phase === PHASES.FAILED) {
-    ui.outcome.hidden = false;
-    ui.outcome.dataset.state = 'failed';
-    ui.outcomeTitle.textContent = 'BATCH WASTED';
-    ui.outcomeDetail.textContent = failureText(core.failureReason);
-    ui.outcomeAction.textContent = 'DESTROY BATCH';
-    ui.outcomeAction.dataset.action = 'destroy';
-    return;
-  }
-
-  if (core.phase === PHASES.COMPLETE) {
-    const batch = core.lastBatch;
-
-    ui.outcome.hidden = false;
-    ui.outcome.dataset.state = 'complete';
-    ui.outcomeTitle.textContent = 'BATCH COMPLETE';
-    ui.outcomeDetail.textContent = batch
-      ? `${batch.bottles} bottles banked — ${batch.seconds} seconds of dash.`
-      : 'Bottles banked.';
-    ui.outcomeAction.textContent = 'NEW BATCH';
-    ui.outcomeAction.dataset.action = 'new';
-    return;
-  }
-
-  ui.outcome.hidden = true;
-}
-
-function renderHint() {
-  switch (core.phase) {
-    case PHASES.COLLECTING:
-      ui.hint.textContent =
-        core.batchSize === 0
-          ? 'Take up to 5 pots.'
-          : 'Add vodka to start the batch — you can still take more pots.';
-      break;
-    case PHASES.PROCESSING: {
-      const step = core.currentStep;
-
-      if (!step) {
-        ui.hint.textContent = '';
-      } else if (step.type === 'hold') {
-        ui.hint.textContent = `${step.label} — hold the button until the bar fills.`;
-      } else {
-        ui.hint.textContent = `${step.label} — click the ingredient.`;
-      }
-      break;
-    }
-    case PHASES.MOVING:
-      ui.hint.textContent = 'Click each pot to move it to the bottling station.';
-      break;
-    case PHASES.BOTTLING:
-      ui.hint.textContent = 'Click the bottling machine once per pot.';
-      break;
-    case PHASES.COMPLETE:
-      ui.hint.textContent = 'Batch bottled. The dash is banked.';
-      break;
-    case PHASES.FAILED:
-      ui.hint.textContent = 'Destroy the wasted batch before starting again.';
-      break;
-    default:
-      ui.hint.textContent = '';
-  }
-}
-
-function render() {
-  renderStats();
-  renderRecipe();
-  renderActions();
-  renderPots();
-  renderMachine();
-  renderBatchBar();
-  renderOutcome();
-  renderHint();
-}
-
 /* ---------- Events ---------- */
 
 function rejectionText(reason) {
   switch (reason) {
     case 'no-pots':
-      return 'No pots yet.';
+      return 'No pots on the line yet.';
     case 'batch-full':
       return 'This batch already has 5 pots.';
     case 'unknown-ingredient':
@@ -659,54 +864,67 @@ function rejectionText(reason) {
 
 function handle(event) {
   switch (event.type) {
-    case 'batch-complete':
-      render();
-      streamBottles(6);
-      break;
-    case 'batch-failed':
-      render();
-      shakeFactory();
-      break;
     case 'bottled':
       render();
       streamBottles(4);
+      break;
+    case 'batch-complete':
+      render();
+      break;
+    case 'batch-failed':
+      endHoldUi();
+      render();
+      shakeFactory();
       break;
     case 'rejected':
       toast(rejectionText(event.reason));
       render();
       break;
-    case 'noop':
-      render();
-      break;
     default:
       render();
-      break;
   }
 }
 
-ui.takePot.addEventListener('click', () => {
-  handle(core.takePot());
-});
-
-ui.machine.addEventListener('click', () => {
-  const event = core.bottleNextPot();
-
-  if (event.type === 'bottled' || event.type === 'batch-complete') {
-    ui.machine.classList.remove('is-pumping');
-    void ui.machine.offsetWidth;
-    ui.machine.classList.add('is-pumping');
+function resetWithFade(event) {
+  if (!event || event.type === 'rejected') {
+    return;
   }
 
-  handle(event);
-});
+  resetting = true;
+  ui.tray.classList.add('is-resetting');
+
+  window.setTimeout(() => {
+    handle(event);
+    moveTrayToActive(true);
+    ui.tray.classList.remove('is-resetting');
+
+    window.setTimeout(() => {
+      resetting = false;
+      render();
+    }, RESET_FADE_MS);
+  }, RESET_FADE_MS);
+}
 
 ui.outcomeAction.addEventListener('click', () => {
-  const action = ui.outcomeAction.dataset.action;
-  handle(action === 'destroy' ? core.destroyBatch() : core.newBatch());
+  if (resetting) {
+    return;
+  }
+
+  if (core.phase === PHASES.FAILED) {
+    resetWithFade(core.destroyBatch());
+  } else if (core.phase === PHASES.COMPLETE) {
+    resetWithFade(core.newBatch());
+  }
 });
 
 /* ---------- Boot ---------- */
 
-buildRecipe();
-buildActions();
+buildStationList();
+buildStations();
 render();
+window.requestAnimationFrame(() => moveTrayToActive(true));
+
+window.addEventListener('resize', () => {
+  moveTrayToActive(true);
+});
+

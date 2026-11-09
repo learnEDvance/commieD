@@ -26,12 +26,11 @@ Then open <http://localhost:8002/>.
 | Take a pot | `TAKE POT` (enabled while collecting and under 5) |
 | Add an ingredient | Click its button |
 | Stir / heat / filter | Press and hold the matching hold button until the bar fills |
-| Move a pot to bottling | Click a pot in the main station |
-| Bottle a pot | Click the bottling machine once per pot |
+| Bottle the batch | After the belt loads the bottler, click `BOTTLE BATCH` once |
 | Clear a wasted batch | `DESTROY BATCH` |
 | Start the next batch | `NEW BATCH`, or take a pot |
 
-The recipe strip highlights the current step, the matching action button glows, and the hint line explains what to do next. Releasing a hold early or clicking an ingredient or the bottling machine out of order wastes the whole batch: the pots are stamped `WASTED`, pending bottles are discarded, and the batch must be destroyed.
+The line highlights the current station, the matching action glows, and the hint line explains what to do next. Clicking an ingredient, a hold, or the bottler out of order wastes the whole batch: the pots are stamped `WASTED`, pending bottles are discarded, and the batch must be destroyed.
 
 
 ## Process
@@ -64,8 +63,8 @@ Pass `recipe: BASE_RECIPE` to play the shorter source recipe.
 - The recipe must be followed exactly, in order.
 - Stirring, heating, and filtering are holds. The browser reports elapsed hold time with `advanceHold(deltaMs)`; the core never reads a clock.
 - Releasing a hold before it finishes wastes the batch.
-- After the recipe, every pot must be moved from the main station to the bottling station.
-- The bottling machine bottles one pot per click.
+- After the recipe, the belt carries every pot to the bottler automatically.
+- The bottler runs the whole batch from one click; the shell bottles one pot at a time.
 - Each pot produces 20 bottles; each bottle is 1 second of speed.
 - A batch completes only after every pot is bottled. Pending bottles are not committed before then.
 - Any order mistake fails the batch. Every pot is marked wasted, pending bottles are discarded, and no output is awarded.
@@ -76,12 +75,16 @@ Pass `recipe: BASE_RECIPE` to play the shorter source recipe.
 
 ## Browser shell
 
-- Two stations: the main station (pot rack, ingredient buttons, hold buttons, take pot) and the bottling station (arrived pots, bottling machine, batch bar).
+- One-way conveyor with eight stations: pot hopper, vodka, beet extract, stir, national spirit, heat, filter, and bottler.
+- A batch tray rides the belt and stops at the glowing station; the belt animates while the tray travels.
+- Ingredient and hold controls stay live at inactive stations, so order mistakes remain possible; take-pot and bottler actions are gated to their phases.
+- The batch number increments when the first pot is taken and appears on both the tray and the HUD.
+- After the filter, the belt auto-carries the tray to the bottler and loads every pot.
+- `BOTTLE BATCH` runs the batch once, bottling one pot at a time with a crate progress bar.
 - Pots fill with colour as the recipe advances and simmer while a hold is active.
-- Moving a pot flies it across the transfer rail to the bottling station.
-- Bottling streams bottles into the batch bar; the machine shows the current batch bottle count.
-- Completion and failure use a focused outcome card with the next action.
-- The recipe strip, glowing action button, and hint line teach the order without a separate tutorial.
+- Bottling streams bottle sprites into the crate; the machine shows the current batch bottle count.
+- Completion and failure use a focused outcome card with the next action. `NEW BATCH` and `DESTROY BATCH` fade the tray and reset the line.
+- The pendant lamps, glowing station, and hint line teach the order without a separate tutorial.
 
 ## Core API
 
@@ -144,13 +147,14 @@ node --test
 - The host should stop calling `advanceHold()` when the mouse is released and call `releaseHold()` once.
 - The browser owns the rAF clock and passes frame deltas; the core stays deterministic.
 - `BASE_RECIPE` preserves the shorter source process; `DEFAULT_RECIPE` is the extended version.
+- The host drives the batch: take 1–5 pots, complete the recipe, transfer the pots, then bottle. The shell only batches the bottling presentation; `bottleNextPot()` remains per pot.
 
 ## Assumptions
 
 - One pot yields 20 bottles, and one bottle is one second of speed.
-- The bottling machine bottles one pot per click.
+- The bottler is triggered once per batch; the core still bottles one pot at a time.
 - The extra beet-extract and filter steps are optional additions, not part of the original source process.
 - Hold durations are placeholders and should be tuned with playtesting.
-- Pot movement is click-to-move; drag-and-drop is not implemented.
+- The belt transfer is automatic in the shell; the core still exposes `movePot()` / `moveNextPot()` for the host.
 - The shell uses CSS placeholders and one bottle sprite until final art arrives.
 - `takeSeconds()` / `takeBottles()` are not wired to the host game yet.

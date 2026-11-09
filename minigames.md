@@ -1,6 +1,6 @@
 # commieD — Minigame Specs
 
-Status: Soul Clicker implemented under `soul-clicker/`; Bullet Press implemented under `bullet-press/`; Stewed Luck and Dash Supplement Factory not started. `idea.md` is still the product source of truth; this file records the working details and open questions for the ghost minigames.
+Status: Soul Clicker, Bullet Press, and Dash Supplement Factory are implemented under their own folders; Stewed Luck is not started. `idea.md` is still the product source of truth; this file records the working details and open questions for the ghost minigames.
 
 ## Shared contract
 
@@ -147,8 +147,8 @@ Rules as implemented:
 - The recipe must be followed exactly, in order.
 - Stirring, heating, and filtering are holds. The browser passes elapsed milliseconds to `advanceHold(deltaMs)`; the core never reads a clock.
 - Releasing a hold before it finishes wastes the batch.
-- After the recipe, every pot must be moved from the main station to the bottling station.
-- The bottling machine bottles one pot per click.
+- After the recipe, the belt carries every pot to the bottler automatically.
+- The bottler is triggered once per batch and bottles one pot at a time; `bottleNextPot()` stays per pot in the core.
 - `1 pot = 20 bottles`; `1 bottle = 1 second` of speed. A full five-pot batch is 100 seconds.
 - Pending bottles are not committed until every pot in the batch is bottled.
 - Any order mistake wastes the **entire batch**: all pots are marked wasted, pending bottles are discarded, and no output is awarded.
@@ -165,20 +165,21 @@ Core interface:
 
 Browser shell as built:
 
-- Main station on the left: five pot slots, `TAKE POT`, and one button per recipe step.
-- Bottling station on the right: arrived pots, the bottling machine, a batch bottle bar, and the running dash total.
+- One-way conveyor with eight stations: pot hopper, vodka, beet extract, stir, national spirit, heat, filter, and bottler.
+- A batch tray rides the belt and stops at the glowing station; the belt animates during travel and the active station scrolls into view.
+- Ingredient and hold controls stay live at inactive stations, so order mistakes remain possible; take-pot and bottler actions are gated to their phases.
+- The batch number increments when the first pot is taken and appears on the tray and in the HUD.
 - Hold buttons fill while held; the pots simmer during a hold.
-- Clicking a pot moves it; a ghost pot flies across the transfer rail.
-- Bottling streams bottle sprites into the batch bar and pulses the machine.
-- Failure blurs the floor, stamps every pot `WASTED`, and asks for `DESTROY BATCH`.
-- Completion banks the bottles in a `BATCH COMPLETE` card with `NEW BATCH`.
-- Pot clicks outside the moving phase are harmless and `TAKE POT` is disabled when unusable; ingredient, hold, and machine clicks stay live so order mistakes remain possible.
+- After the filter, the belt auto-carries the tray to the bottler and loads every pot.
+- `BOTTLE BATCH` runs the batch once, bottling one pot at a time with a crate progress bar and bottle stream.
+- Failure stamps the pots `WASTED` and asks for `DESTROY BATCH`; completion banks the bottles in a `BATCH COMPLETE` card with `NEW BATCH`.
+- Both reset actions fade the tray and return it to the hopper.
+- The pendant lamps, glowing station, and hint line teach the order without a separate tutorial.
 
 Open questions:
 
 - Confirm that each pot should yield 20 one-second bottles rather than a different split.
 - Tune the stir, heat, and filter hold durations.
-- Confirm whether the bottling machine should bottle one pot per click or all pots at once.
-- Decide whether bottled pots should stay click-to-move or gain drag-and-drop.
+- Confirm the bottling run pace (one pot every ~470 ms) against the host's pacing.
 - Decide whether the extra beet-extract and filter steps stay in the final game.
 - Integrate `takeBottles()` / `takeSeconds()` with the host speed resource.
