@@ -73,38 +73,39 @@ export class BotDirector {
       (other) => other.alive && other.teamId !== player.teamId,
     );
 
-    let target = null;
-    let targetDistance = Infinity;
-
-    for (const enemy of enemies) {
-      const distance = Math.hypot(enemy.x - player.x, enemy.y - player.y);
-      if (distance < targetDistance) {
-        target = enemy;
-        targetDistance = distance;
-      }
-    }
+    const rankedEnemies = enemies
+      .map((enemy) => ({
+        enemy,
+        distance: Math.hypot(enemy.x - player.x, enemy.y - player.y),
+        visible: lineOfSight(this.game, player.x, player.y, enemy.x, enemy.y) &&
+          spawnTeamAt(this.game.maze, Math.floor(enemy.x), Math.floor(enemy.y)) === -1,
+      }))
+      .sort((a, b) => Number(b.visible) - Number(a.visible) || a.distance - b.distance);
+    const targetInfo = rankedEnemies[0] ?? null;
+    const target = targetInfo?.enemy ?? null;
+    const targetDistance = targetInfo?.distance ?? Infinity;
+    const visibleTarget = targetInfo?.visible ? target : null;
 
     let desiredAngle = state.wanderAngle;
     let shoot = false;
 
-    if (target) {
+    if (visibleTarget) {
       desiredAngle = Math.atan2(target.y - player.y, target.x - player.x);
-      const visible = lineOfSight(this.game, player.x, player.y, target.x, target.y);
-
-      if (visible && targetDistance < 9 && team.ammo > 40 && this.game.timeMs >= state.fireAt) {
-        shoot = true;
-        state.fireAt = this.game.timeMs + 260 + this.rng.next() * 260;
-      }
-
-      if (targetDistance < 2.2) {
+      if (targetDistance < 2.4) {
         desiredAngle += Math.PI;
-      } else if (targetDistance <= 4.5) {
-        desiredAngle += state.strafeSign * (Math.PI / 2);
+      } else if (targetDistance < 7) {
+        desiredAngle += state.strafeSign * Math.PI / 2;
       }
+      if (targetDistance < 11 && team.ammo > 0 && this.game.timeMs >= state.fireAt) {
+        shoot = true;
+        state.fireAt = this.game.timeMs + 170 + this.rng.next() * 180;
+      }
+    } else if (target) {
+      desiredAngle = this.#routeAngle(player, target.x, target.y, state);
     } else {
       const item = this.#nearestItem(player);
       if (item) {
-        desiredAngle = Math.atan2(item.y + 0.5 - player.y, item.x + 0.5 - player.x);
+        desiredAngle = this.#routeAngle(player, item.x + 0.5, item.y + 0.5, state);
       }
     }
 
@@ -113,6 +114,8 @@ export class BotDirector {
       state.wanderAngle = this.rng.next() * Math.PI * 2;
     }
 
+    const dangerAngle = this.#evadeAngle(player);
+    if (dangerAngle !== null) desiredAngle = dangerAngle;
     const angle = this.#safeAngle(player, desiredAngle);
     const move = directionInput(angle);
 
@@ -123,6 +126,93 @@ export class BotDirector {
       aimY: target ? target.y : player.y + Math.sin(angle) * 4,
       shoot,
     };
+  }
+
+  #routeAngle(player, targetX, targetY, state) {
+    const now = this.game.timeMs;
+    const targetKey = `${Math.floor(targetX)},${Math.floor(targetY)}`;
+    if (state.routeTarget !== targetKey || now >= state.routeAt) {
+      state.routeTarget = targetKey;
+      state.routeAt = now + 400;
+      state.routePoint = this.#firstPathStep(player, targetX, targetY);
+    }
+    if (!state.routePoint) {
+      return Math.atan2(targetY - player.y, targetX - player.x);
+    }
+    return Math.atan2(state.routePoint.y - player.y, state.routePoint.x - player.x);
+  }
+
+  #firstPathStep(player, targetX, targetY) {
+    const { width, height } = this.game.maze;
+    const startX = Math.floor(player.x);
+    const startY = Math.floor(player.y);
+    const start = startY * width + startX;
+    const cameFrom = new Int32Array(width * height).fill(-2);
+    const queue = new Int32Array(width * height);
+    const goals = new Set();
+
+    for (let radius = 0; radius <= 2; radius += 1) {
+      for (let dy = -radius; dy <= radius; dy += 1) {
+        for (let dx = -radius; dx <= radius; dx += 1) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+          const x = Math.floor(targetX) + dx;
+          const y = Math.floor(targetY) + dy;
+          if (x < 1 || y < 1 || x >= width - 1 || y >= height - 1 || blocked(this.game, player.teamId, x + 0.5, y + 0.5)) continue;
+          goals.add(y * width + x);
+        }
+      }
+      if (goals.size) break;
+    }
+    if (!goals.size) return null;
+
+    let head = 0;
+    let tail = 0;
+    queue[tail++] = start;
+    cameFrom[start] = -1;
+    let reached = -1;
+    const directions = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+
+    while (head < tail) {
+      const current = queue[head++];
+      if (goals.has(current)) {
+        reached = current;
+        break;
+      }
+      const x = current % width;
+      const y = Math.floor(current / width);
+      for (const [dx, dy] of directions) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 1 || ny < 1 || nx >= width - 1 || ny >= height - 1) continue;
+        const next = ny * width + nx;
+        if (cameFrom[next] !== -2 || blocked(this.game, player.teamId, nx + 0.5, ny + 0.5)) continue;
+        cameFrom[next] = current;
+        queue[tail++] = next;
+      }
+    }
+    if (reached < 0 || reached === start) return null;
+    let step = reached;
+    while (cameFrom[step] !== start && cameFrom[step] >= 0) step = cameFrom[step];
+    return { x: step % width + 0.5, y: Math.floor(step / width) + 0.5 };
+  }
+
+  #evadeAngle(player) {
+    let nearest = null;
+    let nearestDistance = 0.85;
+    for (const bullet of this.game.bullets) {
+      if (bullet.teamId === player.teamId) continue;
+      const dx = player.x - bullet.x;
+      const dy = player.y - bullet.y;
+      const distance = Math.hypot(dx, dy);
+      const closing = bullet.vx * dx + bullet.vy * dy;
+      if (distance < nearestDistance && closing > 0) {
+        nearest = { dx, dy };
+        nearestDistance = distance;
+      }
+    }
+    if (!nearest) return null;
+    const side = nearest.dx * nearest.dy >= 0 ? 1 : -1;
+    return Math.atan2(nearest.dy * side, -nearest.dx * side);
   }
 
   #ghostInput(player, state) {
@@ -189,6 +279,9 @@ export class BotDirector {
         strafeSign: this.rng.next() < 0.5 ? -1 : 1,
         fireAt: 0,
         ghostTask: 'clicker',
+        routeTarget: null,
+        routeAt: 0,
+        routePoint: null,
       };
       this.state.set(player.id, state);
     }

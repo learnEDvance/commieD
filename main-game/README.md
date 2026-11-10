@@ -6,15 +6,16 @@ the ghost minigames in an iframe console.
 
 ## Run
 
-Multiplayer (recommended):
+One play flow (online when available):
 
 ```sh
 node server/server.js
 ```
 
-Open `http://localhost:8080/`, pick a name and a collective, and join.
-The server owns the maze, both teams, the bots, and one shared Dash Supplement
-Factory per team.
+Open `http://localhost:8080/`, pick a name and a collective, and join. Eight
+players fill each team; bots take open seats so a match is ready even when no
+other people are online. If the WebSocket service is unreachable, the browser
+starts a local bot match automatically.
 
 Local practice:
 
@@ -23,9 +24,8 @@ Local practice:
 python3 -m http.server 8000
 ```
 
-Open `http://localhost:8000/?local=1`. This runs the deterministic
-game in the browser with bots and local minigame contributions. Without
-`?local=1` the page expects the WebSocket server.
+Open `http://localhost:8000/?local=1` to start local practice directly. It runs
+the same eight-player teams, bots, and local minigame contributions.
 
 ## Test
 
@@ -63,8 +63,8 @@ hidden tab never generates resources.
   two tiles wide, and spawn rooms are at least 2×2.
 - `src/game.js` — pure rules: shared HP/ammo/dash, movement, combat, specials,
   ghosts, revival, elimination, winner. It never reads wall-clock time.
-- `src/bots.js` — deterministic local bot inputs; the server reuses them for
-  bot-filled slots.
+- `src/bots.js` — deterministic bot inputs with maze routing, target selection,
+  and projectile dodging; local and server matches use the same AI.
 - `src/net.js` — small reconnecting browser WebSocket client.
 - `src/ghost-console.js` — iframe host, tab switching, `postMessage` bridge, and
   contribution relay.
@@ -98,7 +98,9 @@ the host talks to the server.
 - Authoritative matching and the lobby are implemented; city sharding and
   large-scale load testing are not.
 - Stewed Luck is not started.
-- Bots are deterministic and simple; they are placeholders for human teammates.
+- Bots are deterministic and still less adaptable than human teammates.
+- In local practice, successful hits and item pickups determine which teammates
+  are revived after a team wipe; the lowest performers return as ghosts.
 - The browser client interpolates snapshots but does not predict local
   movement, so very high latency will feel soft.
 - Placeholder art remains until the assets in `../assets-needed.md` arrive.

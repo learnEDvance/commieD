@@ -8,8 +8,8 @@ import {
 export const ROOM_DEFAULTS = Object.freeze({
   seed: 20261110,
   teams: 2,
-  playersPerTeam: 4,
-  botsPerTeam: 2,
+  playersPerTeam: 8,
+  botsPerTeam: 8,
   width: 61,
   height: 61,
   itemsPerTeam: 8,

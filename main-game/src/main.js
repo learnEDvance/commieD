@@ -13,16 +13,17 @@ import { TILE, isWall, spawnTeamAt } from './maze.js';
 import { DashSupplementFactory } from '../../dash-supplement-factory/src/dashSupplementFactoryCore.js';
 
 const params = new URLSearchParams(window.location.search);
-const NETWORK = params.get('local') !== '1';
+let NETWORK = params.get('local') !== '1';
 const TILE_PX = 30;
 const MINIMAP_SIZE = 180;
 const LOCAL_TEAM = 0;
-const PLAYERS_PER_TEAM = 4;
+const PLAYERS_PER_TEAM = 8;
 const LOCAL_AMMO = 900;
 const ITEMS_PER_TEAM = 8;
 const MINIMAP_MODES = ['FULL', 'COMRATS'];
 const INPUT_INTERVAL_MS = 50;
 const DELTA_VISIBLE_MS = 1400;
+const LOCAL_FALLBACK_DELAY_MS = 5000;
 
 const ITEM_META = Object.freeze({
   bomb: { label: 'B', name: 'BOMB', color: '#e23b3b' },
@@ -125,6 +126,7 @@ let hudNext = 0;
 let comratsNext = 0;
 let reserveBaseline = { teamId: null, ammo: 0, dashSeconds: 0 };
 let reserveDelta = { ammo: 0, dashSeconds: 0, until: 0 };
+let localFallbackTimer = null;
 
 function resize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -145,6 +147,7 @@ function startLocalMatch(seed) {
     width: 61,
     height: 61,
     itemsPerTeam: ITEMS_PER_TEAM,
+    reviveByPerformance: true,
   });
 
   me = game.join({ teamId: LOCAL_TEAM, name: 'YOU', color: PLAYER_COLORS[0] });
@@ -399,6 +402,22 @@ function connectNetwork() {
 function setNetworkStatus(status) {
   const previous = networkStatus;
   networkStatus = status;
+
+  if (status === 'ONLINE' && localFallbackTimer !== null) {
+    window.clearTimeout(localFallbackTimer);
+    localFallbackTimer = null;
+  } else if (status === 'OFFLINE' && NETWORK && !networkJoined && localFallbackTimer === null) {
+    localFallbackTimer = window.setTimeout(() => {
+      localFallbackTimer = null;
+      if (networkJoined || networkStatus !== 'OFFLINE') return;
+      NETWORK = false;
+      net?.close();
+      net = null;
+      ui.lobby.hidden = true;
+      startLocalMatch(Math.floor(Math.random() * 1_000_000_000));
+      toast('SERVER AWAY — THE BOTS HAVE THE FLOOR', 'good');
+    }, LOCAL_FALLBACK_DELAY_MS);
+  }
 
   if (!networkJoined) {
     if (ui.lobbyStatus) {
@@ -841,16 +860,6 @@ function handleEvents(events) {
         });
         toast('BOMB — COMMUNAL DEMOLITION', 'bad');
         break;
-      case 'shot':
-        effects.push({
-          type: 'flash',
-          x: event.x ?? null,
-          y: event.y ?? null,
-          playerId: event.playerId,
-          life: 90,
-          total: 90,
-        });
-        break;
       case 'item-collected': {
         const meta = ITEM_META[event.itemType];
         if (event.duplicate) {
@@ -1229,18 +1238,6 @@ function drawEffects() {
       ctx.strokeStyle = `rgba(255, 210, 140, ${0.8 * (1 - progress)})`;
       ctx.lineWidth = 3;
       ctx.stroke();
-    } else if (effect.type === 'flash') {
-      const player = game.playersById.get(effect.playerId);
-      if (!player) {
-        continue;
-      }
-      const [x, y] = worldToScreen(player.x, player.y);
-      const muzzleX = x + Math.cos(player.angle) * PLAYER_RADIUS * TILE_PX * 1.9;
-      const muzzleY = y + Math.sin(player.angle) * PLAYER_RADIUS * TILE_PX * 1.9;
-      ctx.beginPath();
-      ctx.arc(muzzleX, muzzleY, 5 * (1 - progress) + 1, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255, 236, 160, ${1 - progress})`;
-      ctx.fill();
     }
   }
 }
@@ -1735,7 +1732,7 @@ window.addEventListener('keydown', (event) => {
   }
 
   if (
-    minimapModeIndex === 2 &&
+    minimapModeIndex === 1 &&
     game &&
     me &&
     (event.code === 'ArrowUp' || event.code === 'ArrowDown')
@@ -1750,7 +1747,7 @@ window.addEventListener('keydown', (event) => {
     specialRequested = true;
   } else if (event.code === 'KeyX') {
     minimapModeIndex = (minimapModeIndex + 1) % MINIMAP_MODES.length;
-    if (minimapModeIndex === 2 && game && me) {
+    if (minimapModeIndex === 1 && game && me) {
       if (!game.playersById.has(routeTargetId)) {
         routeTargetId = me.id;
       }

@@ -147,3 +147,15 @@ Tick only verified work. One small step at a time.
 - [x] `git diff --check` passes
 - [x] Factory core, host, and server API consistently use batches and dash seconds
 - [ ] Live browser smoke check (local browser networking is unavailable in the current environment)
+
+## Match feel and unified play
+
+- [x] Removed the shot-triggered flash effect from player rendering
+- [x] Centered the active-effect timer notch over the health bar
+- [x] Fixed COMRATS minimap navigation to use the actual second mode
+- [x] Local practice uses eight-player teams and ghosts the least productive players after a team wipe
+- [x] Bots use maze pathfinding, visible-target prioritization, less wasteful shooting, and projectile dodging
+- [x] Hosted matches fill eight-player teams with bots; unavailable servers fall back to local bot play
+- [x] Main-game panels use a shared red-and-gold theme with consistent tokens
+- [x] Main-game suite passes (37 tests)
+- [x] Server suite passes (18 tests)

@@ -118,9 +118,11 @@ export class Game {
     height = 61,
     itemsPerTeam = 4,
     autoJoin = false,
+    reviveByPerformance = false,
   } = {}) {
     this.seed = seed;
     this.playersPerTeam = playersPerTeam;
+    this.reviveByPerformance = reviveByPerformance;
     this.maze = generateMaze({ seed, teams, playersPerTeam, width, height, itemsPerTeam });
     this.rng = makeRng((seed ^ 0x9e3779b9) >>> 0);
     this.players = [];
@@ -185,6 +187,7 @@ export class Game {
       alive: true,
       isGhost: false,
       ghostTask: 'clicker',
+      performance: 0,
       dashMs: 0,
       fireCooldownMs: 0,
       input: { ...EMPTY_INPUT },
@@ -674,6 +677,8 @@ export class Game {
         );
 
         if (victim) {
+          const shooter = this.playersById.get(bullet.ownerId);
+          if (shooter) shooter.performance += bullet.damage;
           this.#damageTeam(victim.teamId, bullet.damage, bullet.teamId, events);
           events.push({
             type: 'bullet-hit',
@@ -804,6 +809,7 @@ export class Game {
         }
 
         item.taken = true;
+        player.performance += 20;
         const result = this.#applyPickup(team, item.type);
         events.push({
           type: 'item-collected',
@@ -897,6 +903,9 @@ export class Game {
     }
 
     const shuffled = this.rng.shuffle([...living]);
+    if (this.reviveByPerformance) {
+      shuffled.sort((a, b) => b.performance - a.performance);
+    }
     const kept = shuffled.slice(0, keepCount);
 
     for (const player of kept) {

@@ -12,17 +12,19 @@ npm --prefix server start
 
 Open <http://localhost:8080/>. The server serves the site and its WebSocket match service from the same origin. For deployment, host this Node server on a service that supports long running processes and WebSocket upgrades; a static-only host cannot run multiplayer matches.
 
-Local practice without the server:
+If the WebSocket server is unreachable, the game automatically starts a local
+bot match. To launch local practice directly without Node:
 
 ```sh
 python3 -m http.server 8000
 ```
 
-Open <http://localhost:8000/?local=1>.
+Open <http://localhost:8000/?local=1>. Both local and hosted matches use eight
+players per collective, with bots filling any open seats.
 
 ## How the pieces connect
 
-- **Main game** (`main-game/`) renders the maze and HUD. It can connect to the authoritative Node server or run locally with bots.
+- **Main game** (`main-game/`) renders the maze and HUD. It connects to the authoritative Node server when available and falls back to a local bot match when it is not.
 - **Soul Clicker** (`soul-clicker/`) contributes HP.
 - **Bullet Press** (`bullet-press/`) contributes ammunition from clean magazines.
 - **Dash Supplement Factory** (`dash-supplement-factory/`) contributes dash seconds from bottled batches; wasted batches can be disposed of manually.

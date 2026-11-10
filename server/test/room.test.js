@@ -56,6 +56,23 @@ test('joining sends a welcome with a JSON-safe maze', () => {
   assert.ok(maze.spawns.length >= 2);
 });
 
+test('an empty server starts a full bot-backed match', () => {
+  const room = new Room({ seed: 12 });
+
+  for (const team of room.game.teams) {
+    const players = room.game.players.filter((player) => player.teamId === team.id);
+    assert.equal(players.length, room.options.playersPerTeam);
+    assert.ok(players.every((player) => player.isBot));
+  }
+
+  const { client } = addClient(room, 'Ana');
+  const joined = room.join(client.id, { name: 'Ana', teamId: 0 });
+  const team = room.game.players.filter((player) => player.teamId === 0);
+  assert.equal(joined.accepted, true);
+  assert.equal(team.length, 8);
+  assert.equal(team.filter((player) => player.isBot).length, 7);
+});
+
 test('joining preserves an available selected teammate colour', () => {
   const room = makeRoom();
   const { client } = addClient(room, 'Ana');

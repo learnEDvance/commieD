@@ -7,10 +7,12 @@
   --gold: var(--commie-gold);
   --gold-soft: var(--commie-gold-soft);
   --red: var(--commie-red-bright);
+  --red-deep: var(--commie-red-deep);
   --red-soft: #ff8a80;
+  --cream: var(--commie-cream);
   --green: var(--commie-green);
   --teal: var(--commie-teal);
-  --panel: rgba(13, 9, 7, 0.84);
+  --panel: rgba(23, 18, 13, 0.9);
   --edge: var(--commie-edge);
 }
 
@@ -56,7 +58,8 @@ body {
   z-index: 5;
   padding: 7px 9px;
   border: 1px solid var(--edge);
-  border-radius: 5px;
+  border-top: 2px solid var(--red);
+  border-radius: 4px;
   background: var(--panel);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.04),
@@ -307,8 +310,9 @@ body {
 
 .effect-notch {
   position: absolute;
-  right: 9px;
+  left: 50%;
   bottom: calc(100% + 3px);
+  transform: translateX(-50%);
   padding: 3px 7px;
   border: 1px solid #4d817d;
   border-radius: 3px 3px 0 0;
@@ -662,18 +666,6 @@ body {
 
 .lobby__status.is-error {
   color: var(--red-soft);
-}
-
-.lobby__local {
-  color: var(--dim);
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  text-decoration: none;
-  text-transform: uppercase;
-}
-
-.lobby__local:hover {
-  color: var(--gold);
 }
 
 /* ---------- Ghost shift ---------- */

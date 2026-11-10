@@ -455,6 +455,42 @@ test('team wipe revives half the living players and turns the rest into ghosts',
   assert.ok(result.events.some((event) => event.type === 'team-revived'));
 });
 
+test('local performance revival ghosts the least productive players', () => {
+  const game = new Game({
+    seed: 140,
+    teams: 2,
+    playersPerTeam: 4,
+    width: 41,
+    height: 41,
+    reviveByPerformance: true,
+  });
+  const players = Array.from({ length: 4 }, () => game.join({ teamId: 0 }));
+  const enemy = game.join({ teamId: 1 });
+  players.forEach((player, index) => { player.performance = index * 10; });
+  game.teams[0].hp = 1;
+  const target = players[0];
+  const spot = findOpenTile(game.maze);
+  target.x = spot.x + 0.5;
+  target.y = spot.y + 0.5;
+  game.bullets.push({
+    id: 999,
+    teamId: 1,
+    ownerId: enemy.id,
+    x: target.x,
+    y: target.y,
+    vx: 0,
+    vy: 0,
+    lifeMs: 500,
+    damage: 1,
+  });
+
+  game.step(16);
+
+  assert.deepEqual(players.map((player) => player.alive), [false, false, true, true]);
+  assert.equal(players[0].isGhost, true);
+  assert.equal(players[1].isGhost, true);
+});
+
 test('a team at two players is eliminated instead of revived', () => {
   const game = new Game({ seed: 15, teams: 2, playersPerTeam: 4, width: 41, height: 41 });
   const first = game.join({ teamId: 0 });
