@@ -299,6 +299,43 @@ export class Game {
     return { accepted: true, hp, ammo, dashSeconds };
   }
 
+  /**
+   * Host integration point for the Soul Clicker's low-CPS penalty.
+   * Unlike combat damage this is a direct drain, so a coat cannot absorb it.
+   * Returns the events caused by the drain so the host can relay a team-down.
+   */
+  drainHp(teamId, amount) {
+    const team = this.teams[teamId];
+    if (!team || team.eliminated) {
+      return { accepted: false, reason: 'eliminated', events: [] };
+    }
+
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value < 0) {
+      throw new RangeError('drain amount must be finite and non-negative');
+    }
+    if (value === 0) {
+      return { accepted: true, hp: 0, events: [] };
+    }
+
+    const events = [];
+    team.hp = Math.max(0, team.hp - value);
+    events.push({
+      type: 'damage',
+      teamId,
+      sourceTeamId: null,
+      source: 'soul-clicker',
+      amount: value,
+      hp: team.hp,
+    });
+
+    if (team.hp <= 0) {
+      this.#downTeam(team, undefined, events);
+    }
+
+    return { accepted: true, hp: value, events };
+  }
+
   snapshot() {
     return {
       timeMs: this.timeMs,

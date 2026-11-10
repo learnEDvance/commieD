@@ -405,6 +405,23 @@ test('contribute banks minigame resources for the whole team', () => {
   });
 });
 
+test('drainHp applies the Soul Clicker penalty and can down a team', () => {
+  const game = new Game({ seed: 21, teams: 2, playersPerTeam: 2, width: 41, height: 41 });
+  game.join({ teamId: 0 });
+  game.join({ teamId: 0 });
+  game.teams[0].activeEffect = { type: 'coat', msLeft: 5000 };
+
+  const before = game.teams[0].hp;
+  const result = game.drainHp(0, 10);
+  assert.equal(result.accepted, true);
+  assert.equal(game.teams[0].hp, before - 10);
+  assert.throws(() => game.drainHp(0, -1), RangeError);
+
+  const downed = game.drainHp(0, 1000);
+  assert.ok(downed.events.some((event) => event.type === 'team-downed'));
+  assert.equal(game.teams[0].hp, 0);
+});
+
 test('ghosts ignore walls and can switch tasks', () => {
   const game = new Game({ seed: 16, teams: 2, playersPerTeam: 4, width: 41, height: 41 });
   const ghost = game.join({ teamId: 0 });
