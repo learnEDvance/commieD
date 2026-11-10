@@ -487,13 +487,12 @@ export class Game {
       move.y /= length;
     }
 
-    // Dash is only spent while the player is actually trying to move.
-    if (input.dash && moving && player.dashMs <= 0 && team.dashSeconds >= DASH_COST_SECONDS) {
+    const startingDash =
+      input.dash && moving && player.dashMs <= 0 && team.dashSeconds >= DASH_COST_SECONDS;
+    if (startingDash) {
       player.dashMs = DASH_DURATION_MS;
-      team.dashSeconds = Math.max(0, team.dashSeconds - DASH_COST_SECONDS);
       player.vx = move.x * DASH_SPEED;
       player.vy = move.y * DASH_SPEED;
-      events.push({ type: 'dash', teamId: team.id, playerId: player.id });
     }
 
     let speed = player.dashMs > 0 ? DASH_SPEED : MOVE_SPEED;
@@ -512,12 +511,22 @@ export class Game {
       const beforeY = player.y;
       this.#movePlayer(player, player.vx * dtSec, player.vy * dtSec);
 
-      if (Math.abs(player.x - beforeX) < 1e-9) {
+      const movedX = Math.abs(player.x - beforeX) >= 1e-9;
+      const movedY = Math.abs(player.y - beforeY) >= 1e-9;
+      if (!movedX) {
         player.vx = 0;
       }
-      if (Math.abs(player.y - beforeY) < 1e-9) {
+      if (!movedY) {
         player.vy = 0;
       }
+      if (startingDash && (movedX || movedY)) {
+        team.dashSeconds = Math.max(0, team.dashSeconds - DASH_COST_SECONDS);
+        events.push({ type: 'dash', teamId: team.id, playerId: player.id });
+      } else if (startingDash) {
+        player.dashMs = 0;
+      }
+    } else if (startingDash) {
+      player.dashMs = 0;
     }
 
     if (Number.isFinite(input.aimX) && Number.isFinite(input.aimY)) {
@@ -1069,33 +1078,28 @@ export class Game {
   }
 
   #nearestFreeTile(x, y, teamId) {
-    const limit = Math.max(this.maze.width, this.maze.height);
+    let nearest = null;
+    let nearestDistanceSquared = Infinity;
 
-    for (let ring = 0; ring <= limit; ring += 1) {
-      for (let dy = -ring; dy <= ring; dy += 1) {
-        for (let dx = -ring; dx <= ring; dx += 1) {
-          if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) {
-            continue;
-          }
+    for (let tileY = 0; tileY < this.maze.height; tileY += 1) {
+      for (let tileX = 0; tileX < this.maze.width; tileX += 1) {
+        if (isWall(this.maze, tileX, tileY)) continue;
 
-          const tileX = Math.floor(x) + dx;
-          const tileY = Math.floor(y) + dy;
+        const centerX = tileX + 0.5;
+        const centerY = tileY + 0.5;
+        if (this.#circleHitsSolid(teamId, centerX, centerY)) continue;
 
-          if (isWall(this.maze, tileX, tileY)) {
-            continue;
-          }
-
-          const centerX = tileX + 0.5;
-          const centerY = tileY + 0.5;
-
-          if (!this.#circleHitsSolid(teamId, centerX, centerY)) {
-            return { x: centerX, y: centerY };
-          }
+        const dx = centerX - x;
+        const dy = centerY - y;
+        const distanceSquared = dx * dx + dy * dy;
+        if (distanceSquared < nearestDistanceSquared) {
+          nearest = { x: centerX, y: centerY };
+          nearestDistanceSquared = distanceSquared;
         }
       }
     }
 
-    return null;
+    return nearest;
   }
 
   #hasEffect(team, type) {

@@ -355,7 +355,7 @@ function advanceLocalFactory(delta) {
   const result = localFactory.advance(delta);
 
   for (const event of result.events) {
-    if (event.type === 'pot-bottled') {
+    if (event.type === 'batch-bottled') {
       game.contribute(me.teamId, { dashSeconds: event.seconds });
       toast(`DASH SUPPLEMENT BOTTLED — +${event.seconds}s TO THE TEAM`, 'good');
     }
@@ -724,9 +724,9 @@ function factoryAction(action) {
   }
 
   if (action.action === 'take') {
-    localFactory.takePot();
+    localFactory.takeBatch();
   } else if (action.action === 'drop') {
-    const result = localFactory.dropPot(Number(action.potId), action.targetId);
+    const result = localFactory.dropBatch(Number(action.batchId), action.targetId);
     if (result.type === 'rejected') {
       toast(`FACTORY — ${String(result.reason).replaceAll('-', ' ').toUpperCase()}`);
     }
@@ -742,13 +742,12 @@ function localFactorySnapshot() {
 
   return {
     elapsedMs: localFactory.elapsedMs,
-    pots: localFactory.pots.filter((pot) => pot.location !== 'exited'),
+    batches: localFactory.batches.filter((batch) => batch.location !== 'exited'),
     stationCapacity: localFactory.stationCapacity,
     bottlerCapacity: localFactory.bottlerCapacity,
-    vialsProduced: localFactory.vialsProduced,
-    secondsProduced: localFactory.secondsProduced,
-    potsBottled: localFactory.potsBottled,
-    potsSpoiled: localFactory.potsSpoiled,
+    pendingDashSeconds: localFactory.pendingDashSeconds,
+    batchesBottled: localFactory.batchesBottled,
+    batchesWasted: localFactory.batchesWasted,
     owners: {},
     cursors: [],
   };
@@ -1127,7 +1126,7 @@ function drawBullets() {
 
   for (const bullet of game.bullets) {
     const [x, y] = worldToScreen(bullet.x, bullet.y);
-    const length = Math.hypot(bullet.vx, bullet.vy) || 1;
+    const length = Math.hybatch(bullet.vx, bullet.vy) || 1;
     const trailX = (bullet.vx / length) * 10;
     const trailY = (bullet.vy / length) * 10;
 
@@ -1700,10 +1699,9 @@ function drawTeamMap() {
     const label = player.name.toUpperCase();
     minimapCtx.fillText(label, selected ? 15 : 10, y);
 
-    minimapCtx.fillStyle = player.alive ? '#7fc96a' : '#5bc0be';
+    minimapCtx.fillStyle = '#7fc96a';
     minimapCtx.textAlign = 'right';
-    const state = player.alive ? 'ALIVE' : `GHOST (${TASK_NAMES[player.ghostTask] ?? 'CLICKER'})`;
-    minimapCtx.fillText(state, size - 10, y);
+    minimapCtx.fillText('ALIVE', size - 10, y);
     minimapCtx.textAlign = 'left';
   });
 

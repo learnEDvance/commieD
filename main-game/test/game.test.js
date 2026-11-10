@@ -202,13 +202,28 @@ test('phaseless recovery relocates a player from a wall to a free tile', () => {
     }
   }
   assert.ok(wall);
-  player.x = wall.x + 0.5;
-  player.y = wall.y + 0.5;
+  const origin = { x: wall.x + 0.5, y: wall.y + 0.5 };
+  player.x = origin.x;
+  player.y = origin.y;
   game.teams[0].activeEffect = { type: 'phaseless', msLeft: 1 };
 
   const result = game.step(1);
 
   assert.equal(isWall(game.maze, Math.floor(player.x), Math.floor(player.y)), false);
+  const eligible = [];
+  for (let y = 0; y < game.maze.height; y += 1) {
+    for (let x = 0; x < game.maze.width; x += 1) {
+      if (game.maze.tiles[y * game.maze.width + x] !== TILE.FREE) continue;
+      if (spawnTeamAt(game.maze, x, y) !== -1 && spawnTeamAt(game.maze, x, y) !== player.teamId) continue;
+      const dx = x + 0.5 - origin.x;
+      const dy = y + 0.5 - origin.y;
+      eligible.push(dx * dx + dy * dy);
+    }
+  }
+  const recoveredDx = player.x - origin.x;
+  const recoveredDy = player.y - origin.y;
+  const recoveredDistanceSquared = recoveredDx * recoveredDx + recoveredDy * recoveredDy;
+  assert.ok(Math.abs(recoveredDistanceSquared - Math.min(...eligible)) < 1e-9);
   assert.ok(result.events.some((event) => event.type === 'phase-recovered' && event.playerId === player.id));
 });
 
@@ -286,6 +301,32 @@ test('dashing spends the shared reserve only when the player moves', () => {
 
   assert.equal(game.teams[0].dashSeconds, START_DASH_SECONDS - 1);
   assert.ok(player.dashMs > 0);
+});
+
+test('dashing into a wall without moving does not spend the shared reserve', () => {
+  const game = new Game({ seed: 12, teams: 2, playersPerTeam: 2, width: 41, height: 41 });
+  const player = game.join({ teamId: 0 });
+  let wall = null;
+  for (let y = 1; y < game.maze.height - 1 && !wall; y += 1) {
+    for (let x = 1; x < game.maze.width - 2 && !wall; x += 1) {
+      if (
+        isWall(game.maze, x + 1, y) &&
+        !isWall(game.maze, x, y) &&
+        spawnTeamAt(game.maze, x, y) === -1
+      ) wall = { x, y };
+    }
+  }
+  assert.ok(wall);
+  player.x = wall.x + 1 - PLAYER_RADIUS;
+  player.y = wall.y + 0.5;
+  const before = game.teams[0].dashSeconds;
+
+  const result = stepWith(game, player, { dash: true, right: true }, 50);
+
+  assert.equal(player.x, wall.x + 1 - PLAYER_RADIUS);
+  assert.equal(game.teams[0].dashSeconds, before);
+  assert.equal(player.dashMs, 0);
+  assert.equal(result.events.some((event) => event.type === 'dash'), false);
 });
 
 test('immediate pickups add HP and dash, and triggered items join the team stack', () => {

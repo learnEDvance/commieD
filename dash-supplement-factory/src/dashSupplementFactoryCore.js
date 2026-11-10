@@ -7,7 +7,7 @@ export const STATIONS = Object.freeze([
   Object.freeze({ id: 'bureau', name: 'INSPECTION', short: 'INSPECTION', kind: 'bureau' }),
 ]);
 
-// Twelve numbered processes. Stations are deliberately reused: a pot visits the
+// Twelve numbered processes. Stations are deliberately reused: a batch visits the
 // vat three times, the still and bureau twice, and the mill, press, and filter
 // once each. The final drop is the bottler.
 export const PROCESSES = Object.freeze([
@@ -116,12 +116,11 @@ export const DEFAULT_CONFIG = Object.freeze({
   bottlerCapacity: 4,
   disposerCapacity: 4,
   disposingMs: 10000,
-  vialsPerPot: 20,
-  secondsPerVial: 1,
+  dashSecondsPerBatch: 20,
   bottlingMs: 10000,
 });
 
-export const POT_STATUS = Object.freeze({
+export const BATCH_STATUS = Object.freeze({
   IDLE: 'idle',
   WORKING: 'working',
   READY: 'ready',
@@ -129,7 +128,7 @@ export const POT_STATUS = Object.freeze({
   BOTTLING: 'bottling',
   DISPOSING: 'disposing',
   DONE: 'done',
-  SPOILED: 'spoiled',
+  WASTED: 'wasted',
 });
 
 function clone(value) {
@@ -188,15 +187,12 @@ function validateConfig(config) {
     }
   }
 
-  for (const key of ['stationCapacity', 'bottlerCapacity', 'disposerCapacity', 'vialsPerPot']) {
+  for (const key of ['stationCapacity', 'bottlerCapacity', 'disposerCapacity', 'dashSecondsPerBatch']) {
     if (!Number.isInteger(config[key]) || config[key] < 1) {
       throw new RangeError(`${key} must be a positive integer`);
     }
   }
 
-  if (!Number.isFinite(config.secondsPerVial) || config.secondsPerVial <= 0) {
-    throw new RangeError('secondsPerVial must be positive');
-  }
   if (!Number.isFinite(config.bottlingMs) || config.bottlingMs <= 0) {
     throw new RangeError('bottlingMs must be positive');
   }
@@ -208,10 +204,10 @@ function validateConfig(config) {
 /**
  * Pure management rules for the Dash Supplement Factory.
  *
- * The player takes empty pots from an unlimited intake, drags each one into the
+ * The player takes empty batches from an unlimited intake, drags each one into the
  * station for its current numbered process, and moves it on before the ready
- * window expires. Stations process four pots at once. After all twelve
- * processes, a pot goes to the bottler and produces 20 one-second vials.
+ * window expires. Stations process four batches at once. After all twelve
+ * processes, a batch goes to the bottler and adds 20 seconds to the team's dash reserve.
  *
  * The core has no DOM or wall clock. The host reports elapsed time with
  * `advance(deltaMs)` and receives every completion, spoil, and bottling event.
@@ -226,46 +222,42 @@ export class DashSupplementFactory {
       .map((process) => ({ ...process }))
       .sort((a, b) => a.order - b.order);
 
-    this._pots = [];
-    this._nextPotId = 1;
+    this._batches = [];
+    this._nextBatchId = 1;
     this._elapsedMs = 0;
-    this._vialsProduced = 0;
-    this._potsBottled = 0;
-    this._potsSpoiled = 0;
+    this._pendingDashSeconds = 0;
+    this._batchesBottled = 0;
+    this._batchesWasted = 0;
   }
 
-  get pots() {
-    return this._pots.map((pot) => ({ ...pot }));
+  get batches() {
+    return this._batches.map((batch) => ({ ...batch }));
   }
 
-  get activePots() {
-    return this._pots
-      .filter((pot) => pot.location !== 'exited')
-      .map((pot) => ({ ...pot }));
+  get activeBatches() {
+    return this._batches
+      .filter((batch) => batch.location !== 'exited')
+      .map((batch) => ({ ...batch }));
   }
 
-  get intakePots() {
-    return this.#potsAt('intake');
+  get intakeBatches() {
+    return this.#batchesAt('intake');
   }
 
   get elapsedMs() {
     return this._elapsedMs;
   }
 
-  get vialsProduced() {
-    return this._vialsProduced;
+  get pendingDashSeconds() {
+    return this._pendingDashSeconds;
   }
 
-  get secondsProduced() {
-    return this._vialsProduced * this.config.secondsPerVial;
+  get batchesBottled() {
+    return this._batchesBottled;
   }
 
-  get potsBottled() {
-    return this._potsBottled;
-  }
-
-  get potsSpoiled() {
-    return this._potsSpoiled;
+  get batchesWasted() {
+    return this._batchesWasted;
   }
 
   get stationCapacity() {
@@ -280,9 +272,9 @@ export class DashSupplementFactory {
     return this.config.disposerCapacity;
   }
 
-  /** Active pots at one station, the intake, or the bottler. */
-  getPotsAt(location) {
-    return this.#potsAt(location);
+  /** Active batches at one station, the intake, or the bottler. */
+  getBatchesAt(location) {
+    return this.#batchesAt(location);
   }
 
   /** Number of occupied slots per station, plus the bottler. */
@@ -290,86 +282,86 @@ export class DashSupplementFactory {
     const result = {};
 
     for (const station of this.stations) {
-      result[station.id] = this.#potsAt(station.id).length;
+      result[station.id] = this.#batchesAt(station.id).length;
     }
-    result.bottler = this.#potsAt('bottler').length;
-    result.disposer = this.#potsAt('disposer').length;
+    result.bottler = this.#batchesAt('bottler').length;
+    result.disposer = this.#batchesAt('disposer').length;
 
     return result;
   }
 
-  /** The process that is running or awaiting movement for a pot, if any. */
-  processFor(potId) {
-    const pot = this._pots.find((candidate) => candidate.id === potId);
+  /** The process that is running or awaiting movement for a batch, if any. */
+  processFor(batchId) {
+    const batch = this._batches.find((candidate) => candidate.id === batchId);
 
-    if (!pot || pot.stepIndex >= this.processes.length) {
+    if (!batch || batch.stepIndex >= this.processes.length) {
       return null;
     }
-    return clone(this.processes[pot.stepIndex]);
+    return clone(this.processes[batch.stepIndex]);
   }
 
-  /** Add one empty pot to the intake. There is no limit. */
-  takePot() {
-    const pot = {
-      id: this._nextPotId,
+  /** Add one empty batch to the intake. There is no limit. */
+  takeBatch() {
+    const batch = {
+      id: this._nextBatchId,
       stepIndex: 0,
       location: 'intake',
-      status: POT_STATUS.IDLE,
+      status: BATCH_STATUS.IDLE,
       progressMs: 0,
       windowMsLeft: 0,
-      spoiled: false,
+      wasted: false,
       bottled: false,
     };
-    this._nextPotId += 1;
-    this._pots.push(pot);
+    this._nextBatchId += 1;
+    this._batches.push(batch);
 
     return {
-      type: 'pot-taken',
-      potId: pot.id,
-      pot: { ...pot },
-      intake: this.#potsAt('intake').length,
+      type: 'batch-taken',
+      batchId: batch.id,
+      batch: { ...batch },
+      intake: this.#batchesAt('intake').length,
     };
   }
 
   /**
-   * Drag a pot into a station or the bottler.
+   * Drag a batch into a station or the bottler.
    *
-   * A pot waiting at the intake or ready at a station can move. Working pots
-   * are rejected with `pot-busy`; a wrong station leaves the pot where it was.
+   * A batch waiting at the intake or ready at a station can move. Working batches
+   * are rejected with `batch-busy`; a wrong station leaves the batch where it was.
    */
-  dropPot(potId, targetId) {
-    const pot = this._pots.find((candidate) => candidate.id === potId);
+  dropBatch(batchId, targetId) {
+    const batch = this._batches.find((candidate) => candidate.id === batchId);
 
-    if (!pot) {
-      return this.#rejected('unknown-pot');
+    if (!batch) {
+      return this.#rejected('unknown-batch');
     }
-    if (pot.location === 'exited') {
-      return this.#rejected('pot-gone');
+    if (batch.location === 'exited') {
+      return this.#rejected('batch-gone');
     }
     if (
-      pot.status === POT_STATUS.WORKING ||
-      pot.status === POT_STATUS.QUEUED ||
-      pot.status === POT_STATUS.BOTTLING ||
-      pot.status === POT_STATUS.DISPOSING
+      batch.status === BATCH_STATUS.WORKING ||
+      batch.status === BATCH_STATUS.QUEUED ||
+      batch.status === BATCH_STATUS.BOTTLING ||
+      batch.status === BATCH_STATUS.DISPOSING
     ) {
-      return this.#rejected('pot-busy');
+      return this.#rejected('batch-busy');
     }
 
     if (targetId === 'bottler') {
-      return this.#dropAtBottler(pot);
+      return this.#dropAtBottler(batch);
     }
-    if (targetId === 'disposer') return this.#dropAtDisposer(pot);
+    if (targetId === 'disposer') return this.#dropAtDisposer(batch);
 
     const station = this.stations.find((candidate) => candidate.id === targetId);
 
     if (!station) {
       return this.#rejected('unknown-station');
     }
-    if (pot.location === targetId) {
+    if (batch.location === targetId) {
       return this.#rejected('already-there');
     }
 
-    const step = this.processes[pot.stepIndex];
+    const step = this.processes[batch.stepIndex];
 
     if (!step) {
       return this.#rejected('ready-for-bottler');
@@ -380,32 +372,32 @@ export class DashSupplementFactory {
         process: clone(step),
       });
     }
-    if (this.#potsAt(targetId).length >= this.config.stationCapacity) {
+    if (this.#batchesAt(targetId).length >= this.config.stationCapacity) {
       return this.#rejected('station-full');
     }
 
-    const from = pot.location;
-    pot.location = targetId;
-    pot.status = POT_STATUS.WORKING;
-    pot.progressMs = 0;
-    pot.windowMsLeft = 0;
+    const from = batch.location;
+    batch.location = targetId;
+    batch.status = BATCH_STATUS.WORKING;
+    batch.progressMs = 0;
+    batch.windowMsLeft = 0;
 
     return {
-      type: 'pot-dropped',
-      potId: pot.id,
+      type: 'batch-dropped',
+      batchId: batch.id,
       from,
       to: targetId,
-      status: pot.status,
-      stepIndex: pot.stepIndex,
+      status: batch.status,
+      stepIndex: batch.stepIndex,
       step: clone(step),
     };
   }
 
   /**
-   * Advance every working, ready, and bottling pot by `deltaMs`.
+   * Advance every working, ready, and bottling batch by `deltaMs`.
    *
    * Returns a tick with an ordered `events` array. The array can contain
-   * process completions, spoiled pots, and bottled pots in the same tick.
+   * process completions, wasted batches, and bottled batches in the same tick.
    */
   advance(deltaMs) {
     if (!Number.isFinite(deltaMs) || deltaMs <= 0) {
@@ -415,59 +407,59 @@ export class DashSupplementFactory {
     this._elapsedMs += deltaMs;
     const events = [];
 
-    for (const pot of this._pots) {
-      if (pot.status === POT_STATUS.WORKING) {
-        const step = this.processes[pot.stepIndex];
+    for (const batch of this._batches) {
+      if (batch.status === BATCH_STATUS.WORKING) {
+        const step = this.processes[batch.stepIndex];
 
         if (!step) {
           continue;
         }
 
-        const completedIndex = pot.stepIndex;
-        pot.progressMs += deltaMs;
+        const completedIndex = batch.stepIndex;
+        batch.progressMs += deltaMs;
 
-        if (pot.progressMs >= step.durationMs) {
-          const overflow = pot.progressMs - step.durationMs;
-          pot.progressMs = step.durationMs;
-          pot.status = POT_STATUS.READY;
-          pot.windowMsLeft = step.windowMs;
-          pot.stepIndex += 1;
+        if (batch.progressMs >= step.durationMs) {
+          const overflow = batch.progressMs - step.durationMs;
+          batch.progressMs = step.durationMs;
+          batch.status = BATCH_STATUS.READY;
+          batch.windowMsLeft = step.windowMs;
+          batch.stepIndex += 1;
           events.push({
             type: 'process-complete',
-            potId: pot.id,
-            stationId: pot.location,
+            batchId: batch.id,
+            stationId: batch.location,
             stepIndex: completedIndex,
             step: clone(step),
-            nextStep: clone(this.processes[pot.stepIndex] ?? null),
-            windowMsLeft: pot.windowMsLeft,
+            nextStep: clone(this.processes[batch.stepIndex] ?? null),
+            windowMsLeft: batch.windowMsLeft,
           });
 
           if (overflow > 0) {
-            pot.windowMsLeft -= overflow;
+            batch.windowMsLeft -= overflow;
 
-            if (pot.windowMsLeft <= 0) {
-              this.#spoil(pot, events, completedIndex);
+            if (batch.windowMsLeft <= 0) {
+              this.#spoil(batch, events, completedIndex);
             }
           }
         }
-      } else if (pot.status === POT_STATUS.READY) {
-        pot.windowMsLeft -= deltaMs;
+      } else if (batch.status === BATCH_STATUS.READY) {
+        batch.windowMsLeft -= deltaMs;
 
-        if (pot.windowMsLeft <= 0) {
-          this.#spoil(pot, events, Math.max(0, pot.stepIndex - 1));
+        if (batch.windowMsLeft <= 0) {
+          this.#spoil(batch, events, Math.max(0, batch.stepIndex - 1));
         }
       }
     }
 
-    // The bottler empties one pot at a time. Anything else in the bottler
-    // waits as a queue, so a large delta can finish several pots in order.
+    // The bottler empties one batch at a time. Anything else in the bottler
+    // waits as a queue, so a large delta can finish several batches in order.
     let bottlingRemaining = deltaMs;
 
     while (bottlingRemaining > 0) {
-      const active = this._pots.find(
+      const active = this._batches.find(
         (candidate) =>
           candidate.location === 'bottler' &&
-          candidate.status === POT_STATUS.BOTTLING,
+          candidate.status === BATCH_STATUS.BOTTLING,
       );
 
       if (!active) {
@@ -483,56 +475,44 @@ export class DashSupplementFactory {
 
       bottlingRemaining -= needed;
       active.progressMs = this.config.bottlingMs;
-      active.status = POT_STATUS.DONE;
+      active.status = BATCH_STATUS.DONE;
       active.bottled = true;
       active.location = 'exited';
-      this._vialsProduced += this.config.vialsPerPot;
-      this._potsBottled += 1;
+      this._pendingDashSeconds += this.config.dashSecondsPerBatch;
+      this._batchesBottled += 1;
       events.push({
-        type: 'pot-bottled',
-        potId: active.id,
-        vials: this.config.vialsPerPot,
-        seconds: this.config.vialsPerPot * this.config.secondsPerVial,
-        vialsProduced: this._vialsProduced,
-        secondsProduced: this.secondsProduced,
+        type: 'batch-bottled',
+        batchId: active.id,
+        seconds: this.config.dashSecondsPerBatch,
+        pendingDashSeconds: this._pendingDashSeconds,
       });
 
-      this.#promoteQueuedPot(events);
+      this.#promoteQueuedBatch(events);
     }
 
     let disposingRemaining = deltaMs;
     while (disposingRemaining > 0) {
-      const active = this._pots.find((candidate) => candidate.location === 'disposer' && candidate.status === POT_STATUS.DISPOSING);
+      const active = this._batches.find((candidate) => candidate.location === 'disposer' && candidate.status === BATCH_STATUS.DISPOSING);
       if (!active) break;
       const needed = this.config.disposingMs - active.progressMs;
       if (disposingRemaining < needed) { active.progressMs += disposingRemaining; break; }
       disposingRemaining -= needed;
       active.progressMs = this.config.disposingMs;
       active.location = 'exited';
-      active.status = POT_STATUS.DONE;
-      events.push({ type: 'batch-disposed', potId: active.id });
-      const next = this._pots.find((candidate) => candidate.location === 'disposer' && candidate.status === POT_STATUS.QUEUED);
-      if (next) { next.status = POT_STATUS.DISPOSING; next.progressMs = 0; }
+      active.status = BATCH_STATUS.DONE;
+      events.push({ type: 'batch-disposed', batchId: active.id });
+      const next = this._batches.find((candidate) => candidate.location === 'disposer' && candidate.status === BATCH_STATUS.QUEUED);
+      if (next) { next.status = BATCH_STATUS.DISPOSING; next.progressMs = 0; }
     }
 
     return this.#tick(deltaMs, events);
   }
 
-  /** Remove all produced vials from the module and return the count. */
-  takeVials() {
-    const vials = this._vialsProduced;
-    this._vialsProduced = 0;
-    return vials;
-  }
-
-  /** Remove all produced vials and return their total speed duration. */
+  /** Return newly produced dash seconds and reset the output accumulator. */
   takeSeconds() {
-    return this.takeVials() * this.config.secondsPerVial;
-  }
-
-  /** Backwards-compatible aliases for hosts that still call them bottles. */
-  takeBottles() {
-    return this.takeVials();
+    const seconds = this._pendingDashSeconds;
+    this._pendingDashSeconds = 0;
+    return seconds;
   }
 
   /**
@@ -542,138 +522,138 @@ export class DashSupplementFactory {
    * and forward player actions so every ghost on the team shares one floor.
    */
   hydrate(snapshot = {}) {
-    const pots = Array.isArray(snapshot.pots) ? snapshot.pots : [];
+    const batches = Array.isArray(snapshot.batches) ? snapshot.batches : [];
     let maxId = 0;
 
-    for (const pot of pots) {
-      maxId = Math.max(maxId, Math.floor(Number(pot?.id) || 0));
+    for (const batch of batches) {
+      maxId = Math.max(maxId, Math.floor(Number(batch?.id) || 0));
     }
 
-    this._pots = pots
-      .filter((pot) => pot && pot.location !== 'exited')
-      .map((pot) => {
-        const id = Math.floor(Number(pot.id) || 0);
+    this._batches = batches
+      .filter((batch) => batch && batch.location !== 'exited')
+      .map((batch) => {
+        const id = Math.floor(Number(batch.id) || 0);
         return {
           id,
-          stepIndex: Math.max(0, Math.floor(Number(pot.stepIndex) || 0)),
-          location: String(pot.location ?? 'intake'),
-          status: String(pot.status ?? POT_STATUS.IDLE),
-          progressMs: Math.max(0, Number(pot.progressMs) || 0),
-          windowMsLeft: Math.max(0, Number(pot.windowMsLeft) || 0),
-          spoiled: Boolean(pot.spoiled),
-          bottled: Boolean(pot.bottled),
+          stepIndex: Math.max(0, Math.floor(Number(batch.stepIndex) || 0)),
+          location: String(batch.location ?? 'intake'),
+          status: String(batch.status ?? BATCH_STATUS.IDLE),
+          progressMs: Math.max(0, Number(batch.progressMs) || 0),
+          windowMsLeft: Math.max(0, Number(batch.windowMsLeft) || 0),
+          wasted: Boolean(batch.wasted),
+          bottled: Boolean(batch.bottled),
         };
       });
 
     this._elapsedMs = Math.max(0, Number(snapshot.elapsedMs) || 0);
-    this._vialsProduced = Math.max(0, Number(snapshot.vialsProduced) || 0);
-    this._potsBottled = Math.max(0, Number(snapshot.potsBottled) || 0);
-    this._potsSpoiled = Math.max(0, Number(snapshot.potsSpoiled) || 0);
-    this._nextPotId = Math.max(this._nextPotId, maxId + 1);
+    this._pendingDashSeconds = Math.max(0, Number(snapshot.pendingDashSeconds) || 0);
+    this._batchesBottled = Math.max(0, Number(snapshot.batchesBottled) || 0);
+    this._batchesWasted = Math.max(0, Number(snapshot.batchesWasted) || 0);
+    this._nextBatchId = Math.max(this._nextBatchId, maxId + 1);
 
     return this;
   }
 
-  #dropAtBottler(pot) {
-    if (pot.stepIndex < this.processes.length) {
+  #dropAtBottler(batch) {
+    if (batch.stepIndex < this.processes.length) {
       return this.#rejected('processes-remaining', {
-        process: clone(this.processes[pot.stepIndex]),
+        process: clone(this.processes[batch.stepIndex]),
       });
     }
-    if (this.#potsAt('bottler').length >= this.config.bottlerCapacity) {
+    if (this.#batchesAt('bottler').length >= this.config.bottlerCapacity) {
       return this.#rejected('bottler-full');
     }
 
-    const from = pot.location;
-    const bottlerBusy = this._pots.some(
+    const from = batch.location;
+    const bottlerBusy = this._batches.some(
       (candidate) =>
         candidate.location === 'bottler' &&
-        candidate.status === POT_STATUS.BOTTLING,
+        candidate.status === BATCH_STATUS.BOTTLING,
     );
 
-    pot.location = 'bottler';
-    pot.status = bottlerBusy ? POT_STATUS.QUEUED : POT_STATUS.BOTTLING;
-    pot.progressMs = 0;
-    pot.windowMsLeft = 0;
+    batch.location = 'bottler';
+    batch.status = bottlerBusy ? BATCH_STATUS.QUEUED : BATCH_STATUS.BOTTLING;
+    batch.progressMs = 0;
+    batch.windowMsLeft = 0;
 
     return {
-      type: 'pot-dropped',
-      potId: pot.id,
+      type: 'batch-dropped',
+      batchId: batch.id,
       from,
       to: 'bottler',
-      status: pot.status,
-      stepIndex: pot.stepIndex,
+      status: batch.status,
+      stepIndex: batch.stepIndex,
       step: null,
     };
   }
 
-  #dropAtDisposer(pot) {
-    if (!pot.spoiled && pot.status !== POT_STATUS.SPOILED) {
+  #dropAtDisposer(batch) {
+    if (!batch.wasted && batch.status !== BATCH_STATUS.WASTED) {
       return this.#rejected('not-wasted');
     }
-    if (this.#potsAt('disposer').length >= this.config.disposerCapacity) {
+    if (this.#batchesAt('disposer').length >= this.config.disposerCapacity) {
       return this.#rejected('disposer-full');
     }
-    const busy = this._pots.some((item) => item.location === 'disposer' && item.status === POT_STATUS.DISPOSING);
-    const from = pot.location;
-    pot.location = 'disposer';
-    pot.status = busy ? POT_STATUS.QUEUED : POT_STATUS.DISPOSING;
-    pot.progressMs = 0;
+    const busy = this._batches.some((item) => item.location === 'disposer' && item.status === BATCH_STATUS.DISPOSING);
+    const from = batch.location;
+    batch.location = 'disposer';
+    batch.status = busy ? BATCH_STATUS.QUEUED : BATCH_STATUS.DISPOSING;
+    batch.progressMs = 0;
     return {
-      type: 'pot-dropped',
-      potId: pot.id,
+      type: 'batch-dropped',
+      batchId: batch.id,
       from,
       to: 'disposer',
-      status: pot.status,
-      stepIndex: pot.stepIndex,
+      status: batch.status,
+      stepIndex: batch.stepIndex,
       step: null,
     };
   }
 
-  /** Start the next waiting pot in the bottler, if any. */
-  #promoteQueuedPot(events) {
-    const next = this._pots.find(
+  /** Start the next waiting batch in the bottler, if any. */
+  #promoteQueuedBatch(events) {
+    const next = this._batches.find(
       (candidate) =>
         candidate.location === 'bottler' &&
-        candidate.status === POT_STATUS.QUEUED,
+        candidate.status === BATCH_STATUS.QUEUED,
     );
 
     if (!next) {
       return null;
     }
 
-    next.status = POT_STATUS.BOTTLING;
+    next.status = BATCH_STATUS.BOTTLING;
     next.progressMs = 0;
     events.push({
       type: 'bottling-started',
-      potId: next.id,
+      batchId: next.id,
     });
 
     return next;
   }
 
-  #spoil(pot, events, stepIndex = pot.stepIndex) {
-    const stationId = pot.location;
+  #spoil(batch, events, stepIndex = batch.stepIndex) {
+    const stationId = batch.location;
 
-    pot.status = POT_STATUS.SPOILED;
+    batch.status = BATCH_STATUS.WASTED;
     // Wasted batches remain in their station until routed to disposal.
-    pot.spoiled = true;
-    pot.windowMsLeft = 0;
-    pot.progressMs = 0;
-    this._potsSpoiled += 1;
+    batch.wasted = true;
+    batch.windowMsLeft = 0;
+    batch.progressMs = 0;
+    this._batchesWasted += 1;
     events.push({
-      type: 'pot-spoiled',
-      potId: pot.id,
+      type: 'batch-wasted',
+      batchId: batch.id,
       stationId,
       stepIndex,
       reason: 'window',
     });
   }
 
-  #potsAt(location) {
-    return this._pots
-      .filter((pot) => pot.location === location)
-      .map((pot) => ({ ...pot }));
+  #batchesAt(location) {
+    return this._batches
+      .filter((batch) => batch.location === location)
+      .map((batch) => ({ ...batch }));
   }
 
   #tick(deltaMs, events) {
@@ -682,8 +662,8 @@ export class DashSupplementFactory {
       deltaMs,
       elapsedMs: this._elapsedMs,
       events,
-      activePots: this._pots.filter((pot) => pot.location !== 'exited').length,
-      vialsProduced: this._vialsProduced,
+      activeBatches: this._batches.filter((batch) => batch.location !== 'exited').length,
+      pendingDashSeconds: this._pendingDashSeconds,
     };
   }
 

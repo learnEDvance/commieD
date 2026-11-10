@@ -2,7 +2,7 @@ import { BotDirector } from '../main-game/src/bots.js';
 import { EMPTY_INPUT, GHOST_TASKS, Game } from '../main-game/src/game.js';
 import {
   DashSupplementFactory,
-  POT_STATUS,
+  BATCH_STATUS,
 } from '../dash-supplement-factory/src/dashSupplementFactoryCore.js';
 
 export const ROOM_DEFAULTS = Object.freeze({
@@ -237,7 +237,7 @@ export class Room {
 
   /* ------------------------------ Factories ------------------------------ */
 
-  handleFactoryAction(clientId, { action, potId, targetId } = {}) {
+  handleFactoryAction(clientId, { action, batchId, targetId } = {}) {
     const client = this.clients.get(clientId);
     const player =
       client && client.playerId !== null
@@ -254,34 +254,34 @@ export class Room {
     }
 
     if (action === 'take') {
-      return state.factory.takePot();
+      return state.factory.takeBatch();
     }
 
     if (action === 'drop') {
-      const result = state.factory.dropPot(Number(potId), targetId);
-      if (result.type === 'pot-dropped') {
-        state.owners.delete(Number(potId));
+      const result = state.factory.dropBatch(Number(batchId), targetId);
+      if (result.type === 'batch-dropped') {
+        state.owners.delete(Number(batchId));
       }
       return result;
     }
 
     if (action === 'claim') {
-      const pot = state.factory.pots.find((entry) => entry.id === Number(potId));
-      if (pot && pot.location !== 'exited') {
-        state.owners.set(Number(potId), {
+      const batch = state.factory.batches.find((entry) => entry.id === Number(batchId));
+      if (batch && batch.location !== 'exited') {
+        state.owners.set(Number(batchId), {
           clientId: client.id,
           name: client.name,
         });
       }
-      return { type: 'claimed', potId: Number(potId) };
+      return { type: 'claimed', batchId: Number(batchId) };
     }
 
     if (action === 'release') {
-      const owner = state.owners.get(Number(potId));
+      const owner = state.owners.get(Number(batchId));
       if (!owner || owner.clientId === client.id) {
-        state.owners.delete(Number(potId));
+        state.owners.delete(Number(batchId));
       }
-      return { type: 'released', potId: Number(potId) };
+      return { type: 'released', batchId: Number(batchId) };
     }
 
     return { type: 'rejected', reason: 'unknown-action' };
@@ -360,12 +360,12 @@ export class Room {
       for (const event of tick.events) {
         events.push(event);
 
-        if (event.type === 'pot-bottled') {
+        if (event.type === 'batch-bottled') {
           this.game.contribute(teamId, { dashSeconds: event.seconds });
           this.#trackContribution(teamId, { dashSeconds: event.seconds });
         }
-        if (event.type === 'pot-spoiled' || event.type === 'pot-bottled') {
-          state.owners.delete(event.potId);
+        if (event.type === 'batch-wasted' || event.type === 'batch-bottled') {
+          state.owners.delete(event.batchId);
         }
       }
 
@@ -375,15 +375,15 @@ export class Room {
         this.factoryEvents.set(teamId, pending);
       }
 
-      // Owners of pots that have left the line are gone.
-      const livePotIds = new Set(
-        state.factory.pots
-          .filter((pot) => pot.location !== 'exited')
-          .map((pot) => pot.id),
+      // Owners of batches that have left the line are gone.
+      const liveBatchIds = new Set(
+        state.factory.batches
+          .filter((batch) => batch.location !== 'exited')
+          .map((batch) => batch.id),
       );
-      for (const potId of state.owners.keys()) {
-        if (!livePotIds.has(potId)) {
-          state.owners.delete(potId);
+      for (const batchId of state.owners.keys()) {
+        if (!liveBatchIds.has(batchId)) {
+          state.owners.delete(batchId);
         }
       }
     }
@@ -462,16 +462,15 @@ export class Room {
     for (const [teamId, state] of this.factories) {
       snapshot.factories[teamId] = {
         elapsedMs: state.factory.elapsedMs,
-        pots: state.factory.pots.filter((pot) => pot.location !== 'exited'),
+        batches: state.factory.batches.filter((batch) => batch.location !== 'exited'),
         stationCapacity: state.factory.stationCapacity,
         bottlerCapacity: state.factory.bottlerCapacity,
         disposerCapacity: state.factory.disposerCapacity,
-        vialsProduced: state.factory.vialsProduced,
-        secondsProduced: state.factory.secondsProduced,
-        potsBottled: state.factory.potsBottled,
-        potsSpoiled: state.factory.potsSpoiled,
+        pendingDashSeconds: state.factory.pendingDashSeconds,
+        batchesBottled: state.factory.batchesBottled,
+        batchesWasted: state.factory.batchesWasted,
         owners: Object.fromEntries(
-          [...state.owners.entries()].map(([potId, owner]) => [potId, { ...owner }]),
+          [...state.owners.entries()].map(([batchId, owner]) => [batchId, { ...owner }]),
         ),
         cursors: [...state.cursors.values()].map((cursor) => ({ ...cursor })),
       };
@@ -609,4 +608,4 @@ export class Room {
   }
 }
 
-export { POT_STATUS };
+export { BATCH_STATUS };

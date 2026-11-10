@@ -134,26 +134,26 @@ test('team factories are shared and bottling awards dash seconds', () => {
   const state = room.factories.get(0);
 
   const taken = room.handleFactoryAction(client.id, { action: 'take' });
-  assert.equal(taken.type, 'pot-taken');
+  assert.equal(taken.type, 'batch-taken');
 
-  const pot = state.factory._pots[0];
-  pot.stepIndex = state.factory.processes.length;
-  pot.location = 'mill';
-  pot.status = 'ready';
-  pot.windowMsLeft = 7000;
+  const batch = state.factory._batches[0];
+  batch.stepIndex = state.factory.processes.length;
+  batch.location = 'mill';
+  batch.status = 'ready';
+  batch.windowMsLeft = 7000;
 
   const dropped = room.handleFactoryAction(client.id, {
     action: 'drop',
-    potId: pot.id,
+    batchId: batch.id,
     targetId: 'bottler',
   });
-  assert.equal(dropped.type, 'pot-dropped');
+  assert.equal(dropped.type, 'batch-dropped');
 
   const dashBefore = room.game.teams[0].dashSeconds;
   room.step(10_000);
 
   assert.equal(room.game.teams[0].dashSeconds, dashBefore + 20);
-  assert.ok(room.getSnapshot().factories[0].potsBottled >= 1);
+  assert.ok(room.getSnapshot().factories[0].batchesBottled >= 1);
 });
 
 test('factory owners are visible to teammates and cleared by a drop', () => {
@@ -164,24 +164,24 @@ test('factory owners are visible to teammates and cleared by a drop', () => {
   const taken = room.handleFactoryAction(first.client.id, { action: 'take' });
   room.handleFactoryAction(first.client.id, {
     action: 'claim',
-    potId: taken.potId,
+    batchId: taken.batchId,
   });
   room.handleFactoryAction(second.client.id, {
     action: 'claim',
-    potId: taken.potId,
+    batchId: taken.batchId,
   });
 
-  const claimed = room.getSnapshot().factories[0].owners[taken.potId];
+  const claimed = room.getSnapshot().factories[0].owners[taken.batchId];
   assert.equal(claimed.clientId, second.client.id);
   assert.equal(claimed.name, 'Boris');
 
   room.handleFactoryAction(second.client.id, {
     action: 'drop',
-    potId: taken.potId,
+    batchId: taken.batchId,
     targetId: 'mill',
   });
 
-  assert.equal(room.getSnapshot().factories[0].owners[taken.potId], undefined);
+  assert.equal(room.getSnapshot().factories[0].owners[taken.batchId], undefined);
 });
 
 test('pointer positions are broadcast through factory snapshots', () => {
@@ -211,7 +211,7 @@ test('a match reset rejoins every client and resets factories', () => {
   assert.equal(room.generation, generation + 1);
   assert.equal(room.game.playersById.get(client.playerId).name, 'Ana');
   assert.ok(messages.some((message) => message.type === 'welcome' && message.generation === room.generation));
-  assert.equal(room.getSnapshot().factories[0].pots.length, 0);
+  assert.equal(room.getSnapshot().factories[0].batches.length, 0);
 });
 
 test('snapshots carry game events and factory events exactly once', () => {

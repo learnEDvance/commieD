@@ -44,7 +44,6 @@ const FLY_DURATION_MS = 220;
 const BULLET_PITCH_PX = 24.8;
 const BULLET_GAP_PX = 8;
 const FEED_TOP_MARGIN_PX = 32;
-const TRUNK_SHIFT_MS = 220;
 const reduceMotion = window.matchMedia
   ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
   : false;
@@ -126,17 +125,9 @@ function advanceTrunk(slotIndex) {
     return;
   }
 
-  const leaving = trunkBullets.splice(slotIndex, 1)[0];
-
-  if (leaving) {
-    leaving.dataset.leaving = 'true';
-    leaving.style.transform = `translateX(${-trunkPitch}px)`;
-    window.setTimeout(() => leaving.remove(), reduceMotion ? 0 : TRUNK_SHIFT_MS + 60);
-  }
-
+  trunkBullets.splice(slotIndex, 1);
   trunkBullets.forEach((bullet, index) => {
-    const position = index >= slotIndex ? index : index;
-    bullet.style.transform = `translateX(${position * trunkPitch}px)`;
+    bullet.style.transform = `translateX(${index * trunkPitch}px)`;
   });
 
   const targetIndex = trunkBullets.length;
@@ -183,7 +174,7 @@ function refillFeedQueue(feed) {
   }
 }
 
-function advanceFeed(feed) {
+function advanceFeed(feed, incomingBullet, sourceRect) {
   const queue = feed.querySelector('.feed__queue');
 
   if (!queue) {
@@ -197,9 +188,24 @@ function advanceFeed(feed) {
     bullet.style.transform = `translateY(${-(index + 1) * BULLET_PITCH_PX}px)`;
   });
 
-  const bullet = createFeedBullet();
-  bullet.style.transform = 'translateY(0)';
+  const bullet = incomingBullet ?? createFeedBullet();
+  bullet.className = 'feed__bullet';
+  bullet.style.transform = '';
   queue.append(bullet);
+
+  if (incomingBullet && sourceRect && !reduceMotion) {
+    const targetRect = bullet.getBoundingClientRect();
+    const dx = sourceRect.left - targetRect.left;
+    const dy = sourceRect.top - targetRect.top;
+    const animation = bullet.animate(
+      [
+        { transform: `translate(${dx}px, ${dy}px)` },
+        { transform: 'translate(0, 0)' },
+      ],
+      { duration: FLY_DURATION_MS, easing: 'ease-in' },
+    );
+    animation.finished.catch(() => {});
+  }
   return bullet;
 }
 
@@ -490,8 +496,7 @@ function handleInput(char) {
     feed?.classList.add('is-wrong');
   }
 
-  const newFeedBullet = feed ? advanceFeed(feed) : null;
-  const feedTargetRect = newFeedBullet?.getBoundingClientRect();
+  advanceFeed(feed, trunkBullet, trunkRect);
   advanceTrunk(slotIndex);
 
   if (core.complete) {
@@ -505,8 +510,6 @@ function handleInput(char) {
   if (!reduceMotion && startRect && targetRect) {
     flyBullet(event.correct, startRect, targetRect);
   }
-  if (!reduceMotion && trunkRect && feedTargetRect) flyBullet(true, trunkRect, feedTargetRect);
-
   if (core.complete) {
     window.clearTimeout(shiftTimer);
     shiftTimer = window.setTimeout(shiftLine, EJECT_DELAY_MS);

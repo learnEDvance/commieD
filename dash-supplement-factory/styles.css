@@ -390,9 +390,9 @@ button {
   animation: station-pulse 0.5s ease;
 }
 
-/* ---------- Pots ---------- */
+/* ---------- Batches ---------- */
 
-.pot {
+.batch {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -407,18 +407,18 @@ button {
   touch-action: none;
 }
 
-.pot:focus-visible {
+.batch:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 3px;
 }
 
-.pot.is-working,
-.pot.is-bottling {
+.batch.is-working,
+.batch.is-bottling {
   cursor: default;
 }
 
 .batch__timer { display: none; }
-.pot.is-ready .batch__timer {
+.batch.is-ready .batch__timer {
   position: absolute;
   display: block;
   left: -14px;
@@ -432,7 +432,7 @@ button {
   box-shadow: 0 0 0 1px #15120d;
 }
 
-.pot__body {
+.batch__body {
   position: relative;
   display: flex;
   flex: 1;
@@ -449,7 +449,7 @@ button {
     inset 0 -2px 4px rgba(0, 0, 0, 0.4);
 }
 
-.pot__liquid {
+.batch__liquid {
   width: 100%;
   height: var(--fill, 0%);
   background:
@@ -463,7 +463,7 @@ button {
 
 /* Empty batches sit in the intake as bright steel shells. */
 
-.pot.is-empty .pot__body {
+.batch.is-empty .batch__body {
   border-color: #8b836e;
   background:
     linear-gradient(90deg, rgba(255, 255, 255, 0.26), transparent 30% 70%, rgba(0, 0, 0, 0.22)),
@@ -474,16 +474,16 @@ button {
     0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
-.pot.is-wasted .pot__body { border-color: #d64545; filter: grayscale(.65); }
-.pot.is-disposing .pot__body { animation: bottling-glow 1.2s ease-in-out infinite; }
+.batch.is-wasted .batch__body { border-color: #d64545; filter: grayscale(.65); }
+.batch.is-disposing .batch__body { animation: bottling-glow 1.2s ease-in-out infinite; }
 
-.pot.is-empty .pot__badge {
+.batch.is-empty .batch__badge {
   border-color: #766e5a;
   background: #28241b;
   color: #c9c0a6;
 }
 
-.pot__badge {
+.batch__badge {
   position: absolute;
   top: -5px;
   right: -6px;
@@ -503,32 +503,32 @@ button {
   letter-spacing: 0.02em;
 }
 
-.pot.is-ready .pot__badge {
+.batch.is-ready .batch__badge {
   border-color: var(--gold);
   background: #2b2410;
   color: var(--gold-soft);
   box-shadow: 0 0 8px rgba(242, 201, 76, 0.45);
 }
 
-.pot.is-bottling .pot__badge {
+.batch.is-bottling .batch__badge {
   border-color: #9c7b1e;
   color: var(--gold);
 }
 
-/* Pots waiting their turn in the bottler stay full and dimmed. */
+/* Batches waiting their turn in the bottler stay full and dimmed. */
 
-.pot.is-queued {
+.batch.is-queued {
   opacity: 0.62;
 }
 
-.pot.is-queued .pot__badge {
+.batch.is-queued .batch__badge {
   border-color: #6b6351;
   color: #b0a78e;
 }
 
-/* While the bottler drains a pot, its liquid visibly falls and bubbles. */
+/* While the bottler drains a batch, its liquid visibly falls and bubbles. */
 
-.pot.is-bottling .pot__body {
+.batch.is-bottling .batch__body {
   border-color: #9c7b1e;
   box-shadow:
     0 0 0 1px rgba(242, 201, 76, 0.18),
@@ -536,13 +536,13 @@ button {
     inset 0 2px 4px rgba(0, 0, 0, 0.55);
 }
 
-.pot.is-bottling .pot__liquid {
+.batch.is-bottling .batch__liquid {
   position: relative;
   overflow: hidden;
   animation: bottling-glow 1.2s ease-in-out infinite;
 }
 
-.pot.is-bottling .pot__liquid::after {
+.batch.is-bottling .batch__liquid::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -554,13 +554,13 @@ button {
   animation: bottling-bubbles 0.9s linear infinite;
 }
 
-.pot__meter, .pot__meter-fill { display: none; }
+.batch__meter, .batch__meter-fill { display: none; }
 
-.pot.is-ready {
-  animation: pot-ready 1.1s ease-in-out infinite;
+.batch.is-ready {
+  animation: batch-ready 1.1s ease-in-out infinite;
 }
 
-.pot.is-ready .pot__body {
+.batch.is-ready .batch__body {
   border-color: #9d822e;
   box-shadow:
     0 0 0 1px rgba(242, 201, 76, 0.2),
@@ -568,19 +568,19 @@ button {
     inset 0 2px 4px rgba(0, 0, 0, 0.55);
 }
 
-.pot.is-warning .pot__meter-fill {
+.batch.is-warning .batch__meter-fill {
   background: #dd9d34;
 }
 
-.pot.is-urgent .pot__meter-fill {
+.batch.is-urgent .batch__meter-fill {
   background: var(--red);
 }
 
-.pot.is-urgent {
-  animation: pot-urgent 0.4s ease-in-out infinite;
+.batch.is-urgent {
+  animation: batch-urgent 0.4s ease-in-out infinite;
 }
 
-.pot.is-dragging-source {
+.batch.is-dragging-source {
   opacity: 0.25;
 }
 
@@ -696,11 +696,11 @@ button {
   text-align: center;
 }
 
-.intake__rack .pot {
+.intake__rack .batch {
   justify-self: center;
 }
 
-.take-pot {
+.take-batch {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -722,18 +722,18 @@ button {
     transform 0.1s ease;
 }
 
-.take-pot:hover {
+.take-batch:hover {
   border-color: var(--gold);
   background:
     linear-gradient(180deg, rgba(242, 201, 76, 0.32), rgba(242, 201, 76, 0.1)),
     #19150b;
 }
 
-.take-pot:active {
+.take-batch:active {
   transform: translateY(1px);
 }
 
-.take-pot strong {
+.take-batch strong {
   color: var(--gold);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
@@ -843,7 +843,7 @@ button {
   animation-duration: 1.25s;
 }
 
-.belt-pot {
+.belt-batch {
   position: absolute;
   top: 50%;
   left: 0;
@@ -1091,7 +1091,7 @@ button {
   transform-origin: 50% 50%;
 }
 
-.drag-ghost .pot__badge {
+.drag-ghost .batch__badge {
   box-shadow: 0 0 8px rgba(242, 201, 76, 0.4);
 }
 
@@ -1111,7 +1111,7 @@ body.is-dragging .station.is-valid-target .station__body {
   pointer-events: none;
 }
 
-.fx-pot {
+.fx-batch {
   position: fixed;
   z-index: 61;
   pointer-events: none;
@@ -1152,13 +1152,13 @@ body.is-dragging .station.is-valid-target .station__body {
   }
 }
 
-@keyframes pot-ready {
+@keyframes batch-ready {
   50% {
     transform: translateY(-1px);
   }
 }
 
-@keyframes pot-urgent {
+@keyframes batch-urgent {
   50% {
     filter: brightness(1.35);
   }
@@ -1282,14 +1282,14 @@ body.is-dragging .station.is-valid-target .station__body {
   white-space: nowrap;
 }
 
-.pot.is-remote-owned .pot__body {
+.batch.is-remote-owned .batch__body {
   box-shadow:
     inset 0 2px 4px rgba(0, 0, 0, 0.55),
     0 0 0 1px rgba(242, 201, 76, 0.55),
     0 0 10px rgba(242, 201, 76, 0.25);
 }
 
-.pot__owner {
+.batch__owner {
   position: absolute;
   bottom: calc(100% + 3px);
   left: 50%;
@@ -1310,7 +1310,7 @@ body.is-dragging .station.is-valid-target .station__body {
   white-space: nowrap;
 }
 
-.pot.remote-pot {
+.batch.remote-batch {
   position: absolute;
   z-index: 2;
   opacity: 0.9;

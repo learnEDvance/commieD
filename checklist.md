@@ -70,14 +70,14 @@ Tick only verified work. One small step at a time.
 - [x] Confirm bottling math (1 batch = 20 seconds)
 - [x] Define twelve numbered communist-themed processes over six reusable stations
 - [x] Pure core: unlimited intake, station drop validation, 4-slot capacity, automatic work, ready windows, spoilage, bottler, disposal
-- [x] Bottler accepts four pots and rejects the fifth until a slot clears
+- [x] Bottler accepts four batches and rejects the fifth until a slot clears
 - [x] Deterministic `advance(deltaMs)` tick with process, spoil, and bottling events
-- [x] Unit tests for route order, station reuse, capacity, wrong drops, busy pots, spoilage, bottling, output APIs, determinism, validation
+- [x] Unit tests for route order, station reuse, capacity, wrong drops, busy batches, waste, bottling, output APIs, determinism, validation
 - [x] Run instructions and core API documented in `dash-supplement-factory/README.md`
 - [x] Browser shell: separate station cards with 2×2 slots, machine protrusions, top-left intake, bottom-right bottler
 - [x] Bottom-left info panel: title, stats, full process plan, live hint
 - [x] Pointer drag-and-drop between stations with dynamic route arrows
-- [x] Pot work progress, ready-window timers, process badges, wrong-drop toasts
+- [x] Batch work progress, ready-window timers, process badges, wrong-drop toasts
 - [x] Bottler empties one batch at a time; queued batches show `WAIT`
 - [x] Wasted batches stay at their station until manually dragged to disposal
 - [x] Disposal empties wasted batches and sends the emptied container away on a conveyor
@@ -87,7 +87,7 @@ Tick only verified work. One small step at a time.
 - [x] Factory visible copy uses batches, not pots
 - [ ] Tune process durations and ready windows through playtesting
 - [ ] Confirm wrong-station drops should stay free
-- [x] Share one authoritative factory per team; ghosts see each other's pots, claims, and cursors
+- [x] Share one authoritative factory per team; ghosts see each other's batches, claims, and cursors
 - [x] Award 20 seconds of team dash for every bottled batch
 - [ ] Replace placeholder art
 
@@ -141,8 +141,9 @@ Tick only verified work. One small step at a time.
 - [x] Updated `idea.md`, `minigames.md`, and project instructions to match the requested behavior
 - [x] Bullet Press suite passes (22 tests)
 - [x] Factory suite passes (25 tests)
-- [x] Main-game suite passes (33 tests)
+- [x] Main-game suite passes (34 tests)
 - [x] Server suite passes (17 tests)
 - [x] Soul Clicker suite passes (22 tests)
 - [x] `git diff --check` passes
+- [x] Factory core, host, and server API consistently use batches and dash seconds
 - [ ] Live browser smoke check (local browser networking is unavailable in the current environment)

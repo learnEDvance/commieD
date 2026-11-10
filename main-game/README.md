@@ -88,10 +88,10 @@ the host talks to the server.
   `Game#drainHp` and skips the coat.
 - Bullet Press → host: `{ type: 'contribute', game: 'bullet-press', resources:
   { ammo: 10 × multiplier } }` for each clean magazine.
-- Dash Supplement Factory → host: `{ type: 'factory-action', action, potId,
+- Dash Supplement Factory → host: `{ type: 'factory-action', action, batchId,
   targetId }` and `{ type: 'pointer', x, y, active }`. The server owns the
   factory, so every ghost on a team works the same floor and sees the other
-  ghosts' cursors and claimed pots.
+  ghosts' cursors and claimed batches.
 
 ## Known limits
 
