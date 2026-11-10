@@ -61,6 +61,17 @@ test('settles HP immediately when a click lands', () => {
   close(clicker.hp, 99.98);
 });
 
+test('registerClick counts CPS without changing HP', () => {
+  const clicker = new SoulClicker({ livingTeammates: 1 });
+  clicker.hp = 150;
+
+  clicker.registerClick(1_000);
+  clicker.registerClick(1_200);
+
+  close(clicker.hp, 150);
+  close(clicker.cpsAt(1_200), 0.2);
+});
+
 test('gains 1 HP/s at 5 CPS', () => {
   const clicker = new SoulClicker({ livingTeammates: 1 });
 

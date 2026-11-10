@@ -1,6 +1,15 @@
 import { ASSETS } from './assets.js';
 import { DashSupplementFactory, POT_STATUS } from './dashSupplementFactoryCore.js';
 
+const params = new URLSearchParams(window.location.search);
+const embedded = params.get('embed') === '1';
+
+function embedPost(payload) {
+  if (embedded && window.parent !== window) {
+    window.parent.postMessage(payload, window.location.origin);
+  }
+}
+
 const core = new DashSupplementFactory();
 const reduceMotion = window.matchMedia
   ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -74,6 +83,7 @@ const ui = {
   spoiledStat: byId('spoiled-stat'),
   toast: byId('toast'),
   fx: byId('fx-layer'),
+  cursors: byId('remote-cursors'),
 };
 
 const stationViews = new Map();
@@ -81,6 +91,11 @@ const planChips = [];
 let drag = null;
 let toastTimer = null;
 let lastFrame = performance.now();
+let remoteClientId = null;
+let remoteOwners = new Map();
+let remoteCursors = new Map();
+let lastRemoteFactory = null;
+let lastPointerSent = 0;
 
 const processByIndex = core.processes;
 const stationMeta = new Map(
@@ -377,9 +392,132 @@ function createPotElement(pot) {
     <span class="pot__meter"><span class="pot__meter-fill"></span></span>
   `;
 
+  const owner = embedded ? remoteOwners.get(pot.id) : null;
+  if (owner && owner.clientId !== remoteClientId) {
+    el.classList.add('is-remote-owned');
+    const tag = document.createElement('span');
+    tag.className = 'pot__owner';
+    tag.textContent = owner.name ?? 'COMRADE';
+    el.append(tag);
+  }
+
   setPotMeter(el, pot);
   return el;
 }
+
+/* ---------- Remote (embedded) floor ---------- */
+
+function sendFactoryAction(action, extra = {}) {
+  if (!embedded) {
+    return;
+  }
+
+  embedPost({ type: 'factory-action', action, ...extra });
+}
+
+function sendPointer(event, active = true) {
+  if (!embedded) {
+    return;
+  }
+
+  const now = performance.now();
+  if (now - lastPointerSent < 60) {
+    return;
+  }
+  lastPointerSent = now;
+
+  const rect = ui.canvas.getBoundingClientRect();
+  if (rect.width < 1 || rect.height < 1) {
+    return;
+  }
+
+  embedPost({
+    type: 'pointer',
+    x: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)),
+    y: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)),
+    active,
+  });
+}
+
+function applyRemoteFactory(factory) {
+  const previous = lastRemoteFactory;
+
+  core.hydrate(factory);
+  remoteOwners = new Map(
+    Object.entries(factory?.owners ?? {}).map(([potId, owner]) => [Number(potId), owner]),
+  );
+  remoteCursors = new Map(
+    (factory?.cursors ?? []).map((cursor) => [cursor.clientId, cursor]),
+  );
+
+  if (previous) {
+    const spoiled =
+      Math.max(0, Number(factory?.potsSpoiled) || 0) -
+      Math.max(0, Number(previous.potsSpoiled) || 0);
+    if (spoiled > 0) {
+      toast(`A pot spoiled — ${spoiled} lost this shift.`);
+    }
+
+    const vials =
+      Math.max(0, Number(factory?.vialsProduced) || 0) -
+      Math.max(0, Number(previous.vialsProduced) || 0);
+    if (vials > 0) {
+      for (let index = 0; index < Math.min(20, vials); index += 1) {
+        spawnVial();
+      }
+    }
+  }
+
+  lastRemoteFactory = factory;
+  render();
+  renderRemoteCursors();
+}
+
+function renderRemoteCursors() {
+  if (!ui.cursors) {
+    return;
+  }
+
+  const cursors = [];
+
+  for (const cursor of remoteCursors.values()) {
+    if (cursor.clientId === remoteClientId) {
+      continue;
+    }
+
+    const el = document.createElement('div');
+    el.className = 'remote-cursor';
+    el.classList.toggle('is-active', Boolean(cursor.active));
+    el.style.left = `${(Number(cursor.x) || 0) * 100}%`;
+    el.style.top = `${(Number(cursor.y) || 0) * 100}%`;
+
+    const tag = document.createElement('span');
+    tag.className = 'remote-cursor__name';
+    tag.textContent = cursor.name ?? 'COMRADE';
+    el.append(tag);
+    cursors.push(el);
+  }
+
+  ui.cursors.replaceChildren(...cursors);
+}
+
+window.addEventListener('message', (event) => {
+  if (!embedded || event.origin !== window.location.origin) {
+    return;
+  }
+
+  const data = event.data;
+  if (!data || data.type !== 'state') {
+    return;
+  }
+
+  if (Number.isInteger(data.clientId)) {
+    remoteClientId = data.clientId;
+  }
+  if (data.factory) {
+    applyRemoteFactory(data.factory);
+  }
+});
 
 /* ---------- Render ---------- */
 
@@ -763,6 +901,7 @@ function onPointerMove(event) {
     return;
   }
 
+  sendPointer(event);
   moveGhost(event.clientX, event.clientY);
   const targetId = targetUnderPointer(event.clientX, event.clientY);
 
@@ -814,6 +953,18 @@ function onPointerUp(event) {
 
   cleanupDrag();
 
+  if (embedded) {
+    sendPointer(event, false);
+
+    if (targetId) {
+      sendFactoryAction('drop', { potId, targetId });
+    } else {
+      sendFactoryAction('release', { potId });
+    }
+    render();
+    return;
+  }
+
   if (targetId) {
     const eventResult = core.dropPot(potId, targetId);
 
@@ -826,7 +977,13 @@ function onPointerUp(event) {
 }
 
 function onPointerCancel() {
+  const potId = drag?.potId ?? null;
   cleanupDrag();
+
+  if (embedded && potId !== null) {
+    sendFactoryAction('release', { potId });
+  }
+
   render();
 }
 
@@ -853,6 +1010,16 @@ function onPointerDown(event) {
       toast(`Pot #${pot.id} is still working.`);
     }
     return;
+  }
+
+  if (embedded) {
+    const owner = remoteOwners.get(pot.id);
+    if (owner && owner.clientId !== remoteClientId) {
+      toast(`Pot #${pot.id} is claimed by ${owner.name ?? 'another comrade'}.`);
+      return;
+    }
+    sendFactoryAction('claim', { potId: pot.id });
+    sendPointer(event);
   }
 
   event.preventDefault();
@@ -1146,6 +1313,11 @@ function handleEvents(events) {
 /* ---------- Input ---------- */
 
 ui.takePot.addEventListener('click', () => {
+  if (embedded) {
+    sendFactoryAction('take');
+    return;
+  }
+
   core.takePot();
   render();
 });
@@ -1175,7 +1347,7 @@ function frame(now) {
   const delta = Math.min(250, Math.max(0, now - lastFrame));
   lastFrame = now;
 
-  if (!document.hidden) {
+  if (!document.hidden && !embedded) {
     const result = core.advance(delta);
 
     if (result.events.length > 0) {
@@ -1198,3 +1370,5 @@ window.requestAnimationFrame((now) => {
   lastFrame = now;
   window.requestAnimationFrame(frame);
 });
+
+embedPost({ type: 'minigame-ready', game: 'dash-supplement-factory' });

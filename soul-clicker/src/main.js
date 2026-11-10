@@ -3,6 +3,13 @@ import { DEFAULT_CONFIG, SoulClicker } from './soulClickerCore.js';
 import { randomShapePlan } from './shapes.js';
 
 const params = new URLSearchParams(window.location.search);
+const embedded = params.get('embed') === '1';
+
+function embedPost(payload) {
+  if (embedded && window.parent !== window) {
+    window.parent.postMessage(payload, window.location.origin);
+  }
+}
 
 function numberParam(name, fallback) {
   const raw = params.get(name);
@@ -43,6 +50,70 @@ if (!hpBar || !hpFill || !hpValue || !hpMeta || !soulButton || !shapeLayer || !p
 const clock = new GameClock();
 const activeShapes = [];
 let pendingShape = null;
+let pendingHp = 0;
+let lastEmbedTick = null;
+let lastContributionAt = 0;
+
+/**
+ * While embedded the host owns team HP, so the iframe never advances its own
+ * copy. It only measures the CPS rate and reports the signed HP change.
+ */
+function embedTick(nowMs) {
+  if (!embedded) {
+    clicker.advanceTo(nowMs);
+    return;
+  }
+
+  if (lastEmbedTick === null) {
+    lastEmbedTick = nowMs;
+    return;
+  }
+
+  const deltaSeconds = Math.max(0, (nowMs - lastEmbedTick) / 1000);
+  lastEmbedTick = nowMs;
+
+  if (deltaSeconds <= 0) {
+    return;
+  }
+
+  pendingHp += clicker.hpPerSecondAt(nowMs) * deltaSeconds;
+
+  if (nowMs - lastContributionAt >= 1000) {
+    flushHp(nowMs);
+  }
+}
+
+function flushHp(nowMs) {
+  if (Math.abs(pendingHp) > 0.001) {
+    embedPost({
+      type: 'contribute',
+      game: 'soul-clicker',
+      resources: { hp: pendingHp },
+    });
+  }
+  pendingHp = 0;
+  lastContributionAt = nowMs;
+}
+
+window.addEventListener('message', (event) => {
+  if (event.origin !== window.location.origin || !embedded) {
+    return;
+  }
+
+  const data = event.data;
+  if (!data || data.type !== 'state') {
+    return;
+  }
+
+  if (Number.isInteger(data.livingTeammates) && data.livingTeammates >= 0) {
+    clicker.setLivingTeammates(data.livingTeammates);
+  }
+  if (Number.isFinite(data.hp)) {
+    clicker.hp = Math.max(0, data.hp);
+  }
+  lastEmbedTick = clock.now();
+  updateHud(clock.now());
+});
 
 function updateHud(nowMs) {
   const cps = clicker.cpsAt(nowMs);
@@ -57,7 +128,7 @@ function updateHud(nowMs) {
 }
 
 function setPaused(next) {
-  if (next === clock.paused) {
+  if (embedded || next === clock.paused) {
     return;
   }
 
@@ -78,7 +149,11 @@ soulButton.addEventListener('click', () => {
   }
 
   const nowMs = clock.now();
-  clicker.click(nowMs);
+  if (embedded) {
+    clicker.registerClick(nowMs);
+  } else {
+    clicker.click(nowMs);
+  }
   updateHud(nowMs);
 });
 
@@ -132,7 +207,15 @@ function spawnShape(plan, nowMs) {
       return;
     }
 
-    clicker.addShapeBonus();
+    if (embedded) {
+      embedPost({
+        type: 'contribute',
+        game: 'soul-clicker',
+        resources: { hp: clicker.config.shapeBonusHp },
+      });
+    } else {
+      clicker.addShapeBonus();
+    }
     removeShape(entry);
     updateHud(clock.now());
   });
@@ -163,7 +246,7 @@ function frame() {
   const nowMs = clock.now();
 
   if (!clock.paused) {
-    clicker.advanceTo(nowMs);
+    embedTick(nowMs);
     updateShapes(nowMs);
   }
 
@@ -171,4 +254,13 @@ function frame() {
   window.requestAnimationFrame(frame);
 }
 
+if (embedded) {
+  document.body.classList.add('is-embedded');
+  const hint = document.querySelector('.hint');
+  if (hint) {
+    hint.textContent = 'Click the soul to feed your comrades';
+  }
+}
+
 window.requestAnimationFrame(frame);
+embedPost({ type: 'minigame-ready', game: 'soul-clicker' });

@@ -542,3 +542,49 @@ test('validates stations, processes, capacities, and timings', () => {
     /positive windowMs/,
   );
 });
+
+test('hydrate mirrors an authoritative floor snapshot', () => {
+  const factory = makeFactory(FAST_CONFIG);
+
+  factory.hydrate({
+    elapsedMs: 4200,
+    vialsProduced: 40,
+    potsBottled: 2,
+    potsSpoiled: 1,
+    pots: [
+      {
+        id: 7,
+        stepIndex: 1,
+        location: 'mill',
+        status: POT_STATUS.WORKING,
+        progressMs: 50,
+        windowMsLeft: 0,
+      },
+      {
+        id: 9,
+        stepIndex: 1,
+        location: 'bottler',
+        status: POT_STATUS.BOTTLING,
+        progressMs: 25,
+        windowMsLeft: 0,
+      },
+      {
+        id: 10,
+        location: 'exited',
+        status: POT_STATUS.DONE,
+      },
+    ],
+  });
+
+  assert.equal(factory.elapsedMs, 4200);
+  assert.equal(factory.vialsProduced, 40);
+  assert.equal(factory.secondsProduced, 40);
+  assert.equal(factory.potsBottled, 2);
+  assert.equal(factory.potsSpoiled, 1);
+  assert.equal(factory.pots.length, 2);
+  assert.equal(factory.getPotsAt('mill')[0].id, 7);
+  assert.equal(factory.getPotsAt('bottler')[0].progressMs, 25);
+
+  const next = factory.takePot();
+  assert.equal(next.potId, 11);
+});

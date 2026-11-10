@@ -71,6 +71,14 @@ export class SoulClicker {
 
   click(nowMs) {
     this.advanceTo(nowMs);
+    return this.registerClick(nowMs);
+  }
+
+  /**
+   * Records a click without applying the CPS rate. The embedded (host-driven)
+   * version uses this because the host owns team HP and applies the rate itself.
+   */
+  registerClick(nowMs) {
     this.clickTimestamps.push(nowMs);
     this.#pruneClicks(nowMs);
     return this.cpsAt(nowMs);

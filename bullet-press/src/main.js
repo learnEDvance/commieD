@@ -1,5 +1,14 @@
 import { BulletPress } from './bulletPressCore.js';
 
+const params = new URLSearchParams(window.location.search);
+const embedded = params.get('embed') === '1';
+
+function embedPost(payload) {
+  if (embedded && window.parent !== window) {
+    window.parent.postMessage(payload, window.location.origin);
+  }
+}
+
 const core = new BulletPress();
 
 const multiplierEl = document.querySelector('#multiplier');
@@ -11,6 +20,8 @@ const codeStatus = document.querySelector('#code-status');
 const magazineTrack = document.querySelector('#magazine-track');
 const feedsEl = document.querySelector('#feeds');
 const fxLayer = document.querySelector('#fx-layer');
+const teamAmmoStat = document.querySelector('#team-ammo-stat');
+const teamAmmoEl = document.querySelector('#team-ammo');
 
 if (
   !multiplierEl ||
@@ -496,6 +507,15 @@ function handleInput(char) {
   if (core.complete) {
     window.clearTimeout(shiftTimer);
     shiftTimer = window.setTimeout(shiftLine, EJECT_DELAY_MS);
+
+    if (embedded && !event.broken && event.multiplier > 0) {
+      // One clean magazine issues 10 rounds per production multiplier.
+      embedPost({
+        type: 'contribute',
+        game: 'bullet-press',
+        resources: { ammo: 10 * event.multiplier },
+      });
+    }
   }
 }
 
@@ -551,9 +571,26 @@ window.addEventListener('resize', () => {
   }
 });
 
+window.addEventListener('message', (event) => {
+  if (!embedded || event.origin !== window.location.origin) {
+    return;
+  }
+
+  const data = event.data;
+  if (!data || data.type !== 'state') {
+    return;
+  }
+
+  if (teamAmmoEl && Number.isFinite(data.ammo)) {
+    teamAmmoEl.textContent = String(Math.floor(data.ammo));
+    teamAmmoStat?.removeAttribute('hidden');
+  }
+});
+
 buildFeeds();
 setupLine();
 docked = true;
 core.start(performance.now());
 render();
 window.requestAnimationFrame(tickElapsed);
+embedPost({ type: 'minigame-ready', game: 'bullet-press' });

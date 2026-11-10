@@ -507,6 +507,45 @@ export class DashSupplementFactory {
     return this.takeVials();
   }
 
+  /**
+   * Mirror an authoritative snapshot received from a host.
+   *
+   * Embedded clients never advance their own factory: they render this state
+   * and forward player actions so every ghost on the team shares one floor.
+   */
+  hydrate(snapshot = {}) {
+    const pots = Array.isArray(snapshot.pots) ? snapshot.pots : [];
+    let maxId = 0;
+
+    for (const pot of pots) {
+      maxId = Math.max(maxId, Math.floor(Number(pot?.id) || 0));
+    }
+
+    this._pots = pots
+      .filter((pot) => pot && pot.location !== 'exited')
+      .map((pot) => {
+        const id = Math.floor(Number(pot.id) || 0);
+        return {
+          id,
+          stepIndex: Math.max(0, Math.floor(Number(pot.stepIndex) || 0)),
+          location: String(pot.location ?? 'intake'),
+          status: String(pot.status ?? POT_STATUS.IDLE),
+          progressMs: Math.max(0, Number(pot.progressMs) || 0),
+          windowMsLeft: Math.max(0, Number(pot.windowMsLeft) || 0),
+          spoiled: Boolean(pot.spoiled),
+          bottled: Boolean(pot.bottled),
+        };
+      });
+
+    this._elapsedMs = Math.max(0, Number(snapshot.elapsedMs) || 0);
+    this._vialsProduced = Math.max(0, Number(snapshot.vialsProduced) || 0);
+    this._potsBottled = Math.max(0, Number(snapshot.potsBottled) || 0);
+    this._potsSpoiled = Math.max(0, Number(snapshot.potsSpoiled) || 0);
+    this._nextPotId = Math.max(this._nextPotId, maxId + 1);
+
+    return this;
+  }
+
   #dropAtBottler(pot) {
     if (pot.stepIndex < this.processes.length) {
       return this.#rejected('processes-remaining', {
