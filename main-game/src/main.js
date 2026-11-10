@@ -102,6 +102,7 @@ let myPlayerId = null;
 let networkTeams = [];
 let networkStatus = NETWORK ? 'CONNECTING' : 'LOCAL';
 let networkJoined = false;
+let networkProtocolReady = false;
 let lobbyTeamId = 0;
 let lobbyColor = PLAYER_COLORS[0];
 let cameraReady = false;
@@ -398,26 +399,42 @@ function connectNetwork() {
     onMessage: handleNetMessage,
   });
   net.connect();
+  scheduleLocalFallback();
+}
+
+function startLocalFallback() {
+  if (!NETWORK || networkJoined) return;
+  if (localFallbackTimer !== null) {
+    window.clearTimeout(localFallbackTimer);
+    localFallbackTimer = null;
+  }
+  NETWORK = false;
+  net?.close();
+  net = null;
+  ui.lobby.hidden = true;
+  startLocalMatch(Math.floor(Math.random() * 1_000_000_000));
+  toast('SERVER AWAY — THE BOTS HAVE THE FLOOR', 'good');
+}
+
+function scheduleLocalFallback() {
+  if (!NETWORK || networkJoined || localFallbackTimer !== null) return;
+  localFallbackTimer = window.setTimeout(() => {
+    localFallbackTimer = null;
+    startLocalFallback();
+  }, LOCAL_FALLBACK_DELAY_MS);
 }
 
 function setNetworkStatus(status) {
   const previous = networkStatus;
   networkStatus = status;
 
-  if (status === 'ONLINE' && localFallbackTimer !== null) {
+  // A WebSocket opening only proves that something is listening. Wait for the
+  // game protocol's hello before treating the server as available.
+  if (networkProtocolReady && localFallbackTimer !== null) {
     window.clearTimeout(localFallbackTimer);
     localFallbackTimer = null;
-  } else if (status === 'OFFLINE' && NETWORK && !networkJoined && localFallbackTimer === null) {
-    localFallbackTimer = window.setTimeout(() => {
-      localFallbackTimer = null;
-      if (networkJoined || networkStatus !== 'OFFLINE') return;
-      NETWORK = false;
-      net?.close();
-      net = null;
-      ui.lobby.hidden = true;
-      startLocalMatch(Math.floor(Math.random() * 1_000_000_000));
-      toast('SERVER AWAY — THE BOTS HAVE THE FLOOR', 'good');
-    }, LOCAL_FALLBACK_DELAY_MS);
+  } else if (!networkProtocolReady) {
+    scheduleLocalFallback();
   }
 
   if (!networkJoined) {
@@ -499,6 +516,7 @@ function joinNetwork() {
   ui.lobbyJoin.disabled = true;
   ui.lobbyStatus.classList.remove('is-error');
   ui.lobbyStatus.textContent = 'JOINING THE COLLECTIVE…';
+  scheduleLocalFallback();
   net.join({ name, teamId: lobbyTeamId, color: lobbyColor });
 }
 
@@ -536,10 +554,19 @@ function renderLobbyTeams() {
 function handleNetMessage(message) {
   switch (message.type) {
     case 'hello':
+      networkProtocolReady = true;
+      if (localFallbackTimer !== null) {
+        window.clearTimeout(localFallbackTimer);
+        localFallbackTimer = null;
+      }
       networkTeams = message.teams ?? [];
       renderLobbyTeams();
       break;
     case 'welcome':
+      if (localFallbackTimer !== null) {
+        window.clearTimeout(localFallbackTimer);
+        localFallbackTimer = null;
+      }
       myClientId = message.clientId;
       myPlayerId = message.playerId;
       networkJoined = true;
@@ -566,12 +593,20 @@ function handleNetMessage(message) {
       applyNetworkSnapshot(message.snapshot);
       break;
     case 'join-rejected':
+      if (localFallbackTimer !== null) {
+        window.clearTimeout(localFallbackTimer);
+        localFallbackTimer = null;
+      }
       ui.lobby.hidden = false;
       ui.lobbyJoin.disabled = false;
       ui.lobbyStatus.textContent = `JOIN FAILED — ${String(message.reason ?? 'UNKNOWN').toUpperCase()}`;
       ui.lobbyStatus.classList.add('is-error');
       break;
     case 'spectating':
+      if (localFallbackTimer !== null) {
+        window.clearTimeout(localFallbackTimer);
+        localFallbackTimer = null;
+      }
       ui.lobby.hidden = false;
       ui.lobbyJoin.disabled = false;
       ui.lobbyStatus.textContent = 'THE TEAMS ARE FULL — TRY AGAIN AFTER THE RESET';
