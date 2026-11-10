@@ -421,7 +421,7 @@ function sendPointer(event, active = true) {
   }
 
   const now = performance.now();
-  if (now - lastPointerSent < 60) {
+  if (active && now - lastPointerSent < 60) {
     return;
   }
   lastPointerSent = now;
@@ -496,6 +496,27 @@ function renderRemoteCursors() {
     tag.textContent = cursor.name ?? 'COMRADE';
     el.append(tag);
     cursors.push(el);
+  }
+
+  // A claimed pot follows its owner's cursor, so teammates watch the same
+  // movement without waiting for the drop snapshot.
+  for (const [potId, owner] of remoteOwners) {
+    if (owner.clientId === remoteClientId) {
+      continue;
+    }
+
+    const cursor = remoteCursors.get(owner.clientId);
+    const pot = findPot(potId);
+    if (!cursor?.active || !pot || !isDraggable(pot)) {
+      continue;
+    }
+
+    const ghost = createPotElement(pot);
+    ghost.classList.add('remote-pot');
+    ghost.disabled = true;
+    ghost.style.left = `${(Number(cursor.x) || 0) * 100}%`;
+    ghost.style.top = `${(Number(cursor.y) || 0) * 100}%`;
+    cursors.push(ghost);
   }
 
   ui.cursors.replaceChildren(...cursors);
@@ -958,9 +979,8 @@ function onPointerUp(event) {
 
     if (targetId) {
       sendFactoryAction('drop', { potId, targetId });
-    } else {
-      sendFactoryAction('release', { potId });
     }
+    sendFactoryAction('release', { potId });
     render();
     return;
   }
