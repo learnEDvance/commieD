@@ -35,6 +35,10 @@ Tick only verified work. One small step at a time.
 - [x] Main feeder paints above the 10 branch feed layers
 - [x] Main feeder stays clogged while branches are full and indexes one bullet per load
 - [x] Branches refill from the main feeder instead of shrinking
+- [x] Aligned main-feeder bullet rises into the selected branch while remaining bullets advance to fill its space
+- [x] The top branch bullet loads into the magazine; remaining bullets shift up and the branch refills at the bottom
+- [x] Timer starts on the first valid keypress, not on magazine docking
+- [x] Q pauses and resumes Bullet Press
 - [x] Magazine shift animation shortened by 200ms
 - [x] Feed bullets centered on their lines and sized to the slots
 - [x] Bullet columns run up every feed and advance when a slot loads
@@ -63,9 +67,9 @@ Tick only verified work. One small step at a time.
 ## Dash Supplement Factory
 
 - [x] Save the management rules, layout, and process plan in `minigames.md`
-- [x] Confirm bottling math (1 pot = 20 vials = 20 seconds)
+- [x] Confirm bottling math (1 batch = 20 seconds)
 - [x] Define twelve numbered communist-themed processes over six reusable stations
-- [x] Pure core: unlimited intake, station drop validation, 4-slot capacity, automatic work, ready windows, spoilage, bottler, vials
+- [x] Pure core: unlimited intake, station drop validation, 4-slot capacity, automatic work, ready windows, spoilage, bottler, disposal
 - [x] Bottler accepts four pots and rejects the fifth until a slot clears
 - [x] Deterministic `advance(deltaMs)` tick with process, spoil, and bottling events
 - [x] Unit tests for route order, station reuse, capacity, wrong drops, busy pots, spoilage, bottling, output APIs, determinism, validation
@@ -74,15 +78,17 @@ Tick only verified work. One small step at a time.
 - [x] Bottom-left info panel: title, stats, full process plan, live hint
 - [x] Pointer drag-and-drop between stations with dynamic route arrows
 - [x] Pot work progress, ready-window timers, process badges, wrong-drop toasts
-- [x] Bottler empties one pot at a time; queued pots show `WAIT` and stay full
-- [x] Upper outfeed belt releases vials one at a time as the active pot drains
-- [x] Lower outfeed belt carries the emptied pot away without fading
-- [x] Placeholder pot, machine, bottle, and vial art with centralized asset paths
-- [x] Browser smoke test: layout, intake, drag, wrong station, full route, sequential bottling, vial belt, empty-pot belt, spoilage
+- [x] Bottler empties one batch at a time; queued batches show `WAIT`
+- [x] Wasted batches stay at their station until manually dragged to disposal
+- [x] Disposal empties wasted batches and sends the emptied container away on a conveyor
+- [x] Ready batches show a circular green-to-yellow-to-red timer
+- [x] The panel shows PROCESSING, available team dash seconds, and WASTED; no vial counter or production log
+- [x] The six processing stations are aligned and show the requested names
+- [x] Factory visible copy uses batches, not pots
 - [ ] Tune process durations and ready windows through playtesting
 - [ ] Confirm wrong-station drops should stay free
 - [x] Share one authoritative factory per team; ghosts see each other's pots, claims, and cursors
-- [x] Award 20 seconds of team dash for every bottled pot
+- [x] Award 20 seconds of team dash for every bottled batch
 - [ ] Replace placeholder art
 
 ## Main Game
@@ -108,7 +114,19 @@ Tick only verified work. One small step at a time.
 - [x] Authoritative dependency-free Node server, raw WebSocket room, bots, and snapshots
 - [x] Lobby with comrade name and collective choice; humans replace bots
 - [x] Server joins preserve an available distinct teammate colour (unit tested)
-- [ ] Browser smoke test: teammate colour picker, reserve change indicators, and effect timer notch
+- [x] Ten distinct teammate colours are available before joining; enemies render red
+- [x] The lobby preserves the mixed-case `commieD` heading
+- [x] Phaseless recovery finds the nearest free tile
+- [x] Dashing spends reserve only while moving
+- [x] Teams without ghosts regenerate +10 ammo/s, +2 HP/s, and +1 dash second/s; teams with ghosts do not
+- [x] Ghosts are omitted from world and minimap drawing; comrats show `ALIVE` or `GHOST (action)`
+- [x] Ammo and dash reserve changes show signed deltas
+- [x] Minimap has full-map and teammate-finder modes only; the finder omits the local player
+- [x] Movement has inertia
+- [x] Special items respawn every 15–60 seconds at random free map locations
+- [x] Effect timers display in a notch above the health bar
+- [x] Removed the unused Vanguard label
+- [x] Root entry point opens the integrated game, and the Node host serves it with the WebSocket match service
 - [x] Ghost console embeds one minigame at a time and relays contributions
 - [x] One shared Dash Supplement Factory per team with claims, cursors, and bottling rewards
 - [x] Server tests: WebSocket codec, room joins, ghost-only contributions, factories, reset
@@ -116,3 +134,15 @@ Tick only verified work. One small step at a time.
 - [ ] City sharding
 - [ ] Load-test for large concurrent matches
 - [ ] Replace placeholder visuals with final art
+
+## Integrated polishing verification
+
+- [x] Root `index.html` preserves query parameters and opens the main game
+- [x] Updated `idea.md`, `minigames.md`, and project instructions to match the requested behavior
+- [x] Bullet Press suite passes (22 tests)
+- [x] Factory suite passes (25 tests)
+- [x] Main-game suite passes (33 tests)
+- [x] Server suite passes (17 tests)
+- [x] Soul Clicker suite passes (22 tests)
+- [x] `git diff --check` passes
+- [ ] Live browser smoke check (local browser networking is unavailable in the current environment)

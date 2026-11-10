@@ -102,7 +102,7 @@ button {
 }
 
 .floor__canvas::before {
-  content: "SHIFT FLOOR 01";
+  content: "DASUP FACTORY";
   position: absolute;
   top: 14px;
   left: 24px;
@@ -153,14 +153,14 @@ button {
 .station__machine {
   position: absolute;
   top: 0;
-  right: 16px;
-  left: 16px;
+  right: 8px;
+  left: 8px;
   z-index: 2;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   height: 40px;
-  padding: 0 8px;
+  padding: 0 5px;
   border: 1px solid var(--machine-edge, #5c5342);
   border-bottom: 0;
   border-radius: 7px 7px 0 0;
@@ -240,9 +240,9 @@ button {
 .station__machine-name {
   overflow: hidden;
   color: #f2ead8;
-  font-size: 7.5px;
+  font-size: 6.4px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -417,14 +417,19 @@ button {
   cursor: default;
 }
 
-.pot__lid {
-  flex: none;
-  width: 38%;
-  height: 4px;
-  margin-bottom: 2px;
-  border-radius: 2px 2px 1px 1px;
-  background: linear-gradient(180deg, #a09780, #514b3e);
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+.batch__timer { display: none; }
+.pot.is-ready .batch__timer {
+  position: absolute;
+  display: block;
+  left: -14px;
+  top: 50%;
+  width: 13px;
+  height: 13px;
+  transform: translateY(-50%);
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: conic-gradient(var(--timer-color, #7fc96a) var(--timer-progress, 360deg), #302b22 0);
+  box-shadow: 0 0 0 1px #15120d;
 }
 
 .pot__body {
@@ -456,7 +461,7 @@ button {
     background-color 0.25s ease;
 }
 
-/* Empty pots sit in the intake as bright steel shells. */
+/* Empty batches sit in the intake as bright steel shells. */
 
 .pot.is-empty .pot__body {
   border-color: #8b836e;
@@ -469,9 +474,8 @@ button {
     0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
-.pot.is-empty .pot__lid {
-  background: linear-gradient(180deg, #d2c9b1, #766e5a);
-}
+.pot.is-wasted .pot__body { border-color: #d64545; filter: grayscale(.65); }
+.pot.is-disposing .pot__body { animation: bottling-glow 1.2s ease-in-out infinite; }
 
 .pot.is-empty .pot__badge {
   border-color: #766e5a;
@@ -550,31 +554,7 @@ button {
   animation: bottling-bubbles 0.9s linear infinite;
 }
 
-.pot__meter {
-  position: absolute;
-  right: 1px;
-  bottom: -7px;
-  left: 1px;
-  height: 3px;
-  overflow: hidden;
-  border-radius: 2px;
-  background: #0a0805;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.9);
-}
-
-.pot__meter-fill {
-  width: var(--meter, 0%);
-  height: 100%;
-  border-radius: inherit;
-  background: var(--meter-color, var(--green));
-  transition:
-    width 0.08s linear,
-    background-color 0.18s ease;
-}
-
-.pot.is-empty .pot__meter {
-  opacity: 0;
-}
+.pot__meter, .pot__meter-fill { display: none; }
 
 .pot.is-ready {
   animation: pot-ready 1.1s ease-in-out infinite;
@@ -706,7 +686,7 @@ button {
 }
 
 .intake__rack.is-empty::after {
-  content: "NO EMPTIES — TAKE A POT";
+  content: "NO EMPTIES — TAKE A BATCH";
   display: grid;
   min-height: 58px;
   place-items: center;
@@ -778,11 +758,6 @@ button {
   width: 440px;
   pointer-events: none;
   filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.35));
-}
-
-.outfeed--vials {
-  top: 44px;
-  height: 38px;
 }
 
 .outfeed--empties {
@@ -866,17 +841,6 @@ button {
     ),
     repeating-linear-gradient(90deg, #17140e 0 18px, #211d15 18px 36px);
   animation-duration: 1.25s;
-}
-
-.belt-vial {
-  position: absolute;
-  top: 50%;
-  left: 2px;
-  width: 9px;
-  height: 24px;
-  margin-top: -12px;
-  filter: drop-shadow(0 0 5px rgba(242, 201, 76, 0.5));
-  will-change: transform;
 }
 
 .belt-pot {

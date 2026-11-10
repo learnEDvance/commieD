@@ -1,4 +1,3 @@
-import { ASSETS } from './assets.js';
 import { DashSupplementFactory, POT_STATUS } from './dashSupplementFactoryCore.js';
 
 const params = new URLSearchParams(window.location.search);
@@ -11,19 +10,21 @@ function embedPost(payload) {
 }
 
 const core = new DashSupplementFactory();
+let availableDashSeconds = 0;
 const reduceMotion = window.matchMedia
   ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
   : false;
 
 const INTAKE_POSITION = { x: 8, y: 16 };
 const STATION_POSITIONS = {
-  mill: { x: 27, y: 17 },
-  vat: { x: 48, y: 15 },
-  still: { x: 69, y: 17 },
-  press: { x: 38, y: 48 },
-  bureau: { x: 56, y: 47 },
-  filter: { x: 74, y: 48 },
-  bottler: { x: 76, y: 84 },
+  mill: { x: 23, y: 20 },
+  vat: { x: 43, y: 20 },
+  press: { x: 63, y: 20 },
+  still: { x: 83, y: 20 },
+  filter: { x: 23, y: 58 },
+  bureau: { x: 43, y: 58 },
+  bottler: { x: 63, y: 58 },
+  disposer: { x: 83, y: 58 },
 };
 const FLOW_INDEX = {
   intake: 0,
@@ -34,6 +35,7 @@ const FLOW_INDEX = {
   bureau: 5,
   filter: 6,
   bottler: 7,
+  disposer: 8,
 };
 
 const LIQUID = {
@@ -44,6 +46,7 @@ const LIQUID = {
   filter: '#7fc9ba',
   bureau: '#9d86ca',
   bottler: '#f2c94c',
+  disposer: '#d64545',
 };
 
 const MACHINE_ICONS = {
@@ -54,6 +57,7 @@ const MACHINE_ICONS = {
   filter: '<svg viewBox="0 0 24 24"><path d="M4 5h16l-6 7v6l-4 2v-8L4 5Z"/></svg>',
   bureau: '<svg viewBox="0 0 24 24"><path d="M5 3h10l4 4v14H5z"/><path d="M15 3v4h4M8 11h8M8 15h6"/></svg>',
   bottler: '<svg viewBox="0 0 24 24"><path d="M9 2h6M10 2v4l-2 3v11h8V9l-2-3V2"/><path d="M8 13h8"/></svg>',
+  disposer: '<svg viewBox="0 0 24 24"><path d="M4 5h16M6 5l1 16h10l1-16M9 9v8M15 9v8"/><path d="M9 2h6"/></svg>',
 };
 
 function byId(id) {
@@ -78,7 +82,6 @@ const ui = {
   hint: byId('hint'),
   lamp: byId('hud-lamp'),
   activeStat: byId('active-stat'),
-  vialsStat: byId('vials-stat'),
   dashStat: byId('dash-stat'),
   spoiledStat: byId('spoiled-stat'),
   toast: byId('toast'),
@@ -125,7 +128,7 @@ function buildStations() {
         <div class="station__slots"></div>
         <div class="station__meta">
           <span data-count>0 / ${core.stationCapacity}</span>
-          <span>2 × 2</span>
+          <span>BATCHES ${core.stationCapacity}</span>
         </div>
       </div>
     `;
@@ -158,13 +161,7 @@ function buildStations() {
       <div class="station__slots"></div>
       <div class="station__meta">
         <span data-count>0 / ${core.bottlerCapacity}</span>
-        <span>VIALS →</span>
-      </div>
-    </div>
-    <div class="outfeed outfeed--vials" aria-hidden="true">
-      <span class="outfeed__label">VIALS</span>
-      <div class="belt">
-        <span class="belt__track" data-vial-track></span>
+        <span>DASH →</span>
       </div>
     </div>
     <div class="outfeed outfeed--empties" aria-hidden="true">
@@ -182,8 +179,33 @@ function buildStations() {
     count: bottler.querySelector('[data-count]'),
     capacity: core.bottlerCapacity,
     label: 'BOTTLER',
-    vialTrack: bottler.querySelector('[data-vial-track]'),
     emptiesTrack: bottler.querySelector('[data-empties-track]'),
+  });
+
+  const disposerPosition = STATION_POSITIONS.disposer;
+  const disposer = document.createElement('section');
+  disposer.className = 'station station--disposer';
+  disposer.dataset.stationId = 'disposer';
+  disposer.style.setProperty('--x', `${disposerPosition.x}%`);
+  disposer.style.setProperty('--y', `${disposerPosition.y}%`);
+  disposer.setAttribute('aria-label', 'Batch disposal');
+  disposer.innerHTML = `
+    <div class="station__machine machine--disposer">
+      <span class="station__icon" aria-hidden="true">${MACHINE_ICONS.disposer}</span>
+      <span class="station__machine-name">DISPOSAL</span>
+      <span class="station__index">WASTE</span>
+      <span class="station__lamp" aria-hidden="true"></span>
+    </div>
+    <div class="station__body"><div class="station__slots"></div><div class="station__meta"><span data-count>0 / ${core.disposerCapacity}</span><span>EMPTY</span></div></div>
+    <div class="outfeed outfeed--empties" aria-hidden="true"><span class="outfeed__label">DISPOSED</span><div class="belt belt--empties"><span class="belt__track" data-empties-track></span></div></div>`;
+  ui.stations.append(disposer);
+  stationViews.set('disposer', {
+    card: disposer,
+    slots: disposer.querySelector('.station__slots'),
+    count: disposer.querySelector('[data-count]'),
+    capacity: core.disposerCapacity,
+    label: 'DISPOSAL',
+    emptiesTrack: disposer.querySelector('[data-empties-track]'),
   });
 }
 
@@ -229,6 +251,7 @@ function potFill(pot) {
     const remaining = 1 - pot.progressMs / core.config.bottlingMs;
     return Math.max(0, Math.min(1, remaining)) * 100;
   }
+  if (pot.location === 'disposer') return Math.max(0, 100 * (1 - pot.progressMs / core.config.disposingMs));
 
   const total = processByIndex.length;
   let completed = Math.min(pot.stepIndex, total);
@@ -251,6 +274,7 @@ function potLiquid(pot) {
   if (pot.location === 'bottler') {
     return LIQUID.bottler;
   }
+  if (pot.location === 'disposer' || pot.status === POT_STATUS.SPOILED) return LIQUID.disposer;
 
   const index =
     pot.status === POT_STATUS.WORKING
@@ -268,6 +292,8 @@ function potBadge(pot) {
   if (pot.location === 'bottler') {
     return pot.status === POT_STATUS.QUEUED ? 'WAIT' : 'BTL';
   }
+  if (pot.location === 'disposer') return pot.status === POT_STATUS.QUEUED ? 'WAIT' : 'WASTE';
+  if (pot.status === POT_STATUS.SPOILED) return 'WASTE';
   if (pot.status === POT_STATUS.WORKING) {
     return String(processByIndex[pot.stepIndex]?.order ?? '·');
   }
@@ -277,34 +303,36 @@ function potBadge(pot) {
 }
 
 function potTitle(pot) {
+  if (pot.status === POT_STATUS.SPOILED) return `Wasted batch #${pot.id} — drag to disposal`;
+  if (pot.location === 'disposer') return `Batch #${pot.id} — disposal in progress`;
   if (pot.location === 'intake') {
-    return `Pot #${pot.id} — empty, drag it to the mill`;
+    return `Batch #${pot.id} — empty, drag it to the mill`;
   }
   if (pot.location === 'bottler') {
     if (pot.status === POT_STATUS.QUEUED) {
-      return `Pot #${pot.id} — waiting in the bottler queue`;
+      return `Batch #${pot.id} — waiting in the bottler queue`;
     }
     const secondsLeft = Math.max(
       0,
       (core.config.bottlingMs - pot.progressMs) / 1000,
     );
-    return `Pot #${pot.id} — emptying into vials (${secondsLeft.toFixed(
+    return `Batch #${pot.id} — bottling (${secondsLeft.toFixed(
       1,
     )}s left)`;
   }
   if (pot.status === POT_STATUS.WORKING) {
     const process = processByIndex[pot.stepIndex];
-    return `Pot #${pot.id} — process ${process.order} ${process.name} in progress`;
+    return `Batch #${pot.id} — process ${process.order} ${process.name} in progress`;
   }
 
   const next = processByIndex[pot.stepIndex];
   return next
-    ? `Pot #${pot.id} — ready, next process ${next.order} at ${stationMeta.get(next.stationId).short}`
-    : `Pot #${pot.id} — ready for the bottler`;
+    ? `Batch #${pot.id} — ready, next process ${next.order} at ${stationMeta.get(next.stationId).short}`
+    : `Batch #${pot.id} — ready for the bottler`;
 }
 
 function isDraggable(pot) {
-  return pot.location === 'intake' || pot.status === POT_STATUS.READY;
+  return pot.location === 'intake' || pot.status === POT_STATUS.READY || pot.status === POT_STATUS.SPOILED;
 }
 
 function meterDetails(pot) {
@@ -324,6 +352,9 @@ function meterDetails(pot) {
       mode: 'bottling',
     };
   }
+  if (pot.status === POT_STATUS.DISPOSING) {
+    return { ratio: Math.max(0, 1 - pot.progressMs / core.config.disposingMs), color: '#d64545', mode: 'ready' };
+  }
 
   if (pot.status === POT_STATUS.READY) {
     const process = processByIndex[Math.max(0, pot.stepIndex - 1)];
@@ -333,7 +364,7 @@ function meterDetails(pot) {
 
     return {
       ratio,
-      color: ratio <= 0.25 ? '#d64545' : ratio <= 0.5 ? '#dd9d34' : '#f2c94c',
+      color: ratio <= 0.25 ? '#d64545' : ratio <= 0.5 ? '#dd9d34' : '#96d05c',
       mode: 'ready',
     };
   }
@@ -345,6 +376,8 @@ function setPotMeter(el, pot) {
   const meter = meterDetails(pot);
   el.style.setProperty('--meter', `${Math.round(meter.ratio * 100)}%`);
   el.style.setProperty('--meter-color', meter.color);
+  el.style.setProperty('--timer-progress', `${Math.round(meter.ratio * 360)}deg`);
+  el.style.setProperty('--timer-color', meter.color);
   el.classList.toggle(
     'is-warning',
     meter.mode === 'ready' && meter.ratio <= 0.5 && meter.ratio > 0.25,
@@ -378,6 +411,8 @@ function createPotElement(pot) {
   if (pot.status === POT_STATUS.QUEUED) {
     el.classList.add('is-queued');
   }
+  if (pot.status === POT_STATUS.SPOILED) el.classList.add('is-wasted');
+  if (pot.status === POT_STATUS.DISPOSING) el.classList.add('is-disposing');
   if (isDraggable(pot)) {
     el.classList.add('is-draggable');
   }
@@ -387,9 +422,8 @@ function createPotElement(pot) {
 
   el.innerHTML = `
     <span class="pot__badge">${potBadge(pot)}</span>
-    <span class="pot__lid"></span>
     <span class="pot__body"><span class="pot__liquid"></span></span>
-    <span class="pot__meter"><span class="pot__meter-fill"></span></span>
+    <span class="batch__timer" aria-hidden="true"></span>
   `;
 
   const owner = embedded ? remoteOwners.get(pot.id) : null;
@@ -455,18 +489,10 @@ function applyRemoteFactory(factory) {
       Math.max(0, Number(factory?.potsSpoiled) || 0) -
       Math.max(0, Number(previous.potsSpoiled) || 0);
     if (spoiled > 0) {
-      toast(`A pot spoiled — ${spoiled} lost this shift.`);
+      toast(`A batch became waste — ${spoiled} lost this shift.`);
     }
 
-    const vials =
-      Math.max(0, Number(factory?.vialsProduced) || 0) -
-      Math.max(0, Number(previous.vialsProduced) || 0);
-    if (vials > 0) {
-      for (let index = 0; index < Math.min(20, vials); index += 1) {
-        spawnVial();
       }
-    }
-  }
 
   lastRemoteFactory = factory;
   render();
@@ -531,6 +557,7 @@ window.addEventListener('message', (event) => {
   if (!data || data.type !== 'state') {
     return;
   }
+  availableDashSeconds = Math.max(0, Number(data.dashSeconds) || 0);
 
   if (Number.isInteger(data.clientId)) {
     remoteClientId = data.clientId;
@@ -553,8 +580,7 @@ function renderHud() {
 
   ui.emptiesCount.textContent = String(core.intakePots.length);
   ui.activeStat.textContent = String(active.length);
-  ui.vialsStat.textContent = String(core.vialsProduced);
-  ui.dashStat.textContent = `${core.secondsProduced}s`;
+  ui.dashStat.textContent = `${Math.floor(availableDashSeconds)}s`;
   ui.spoiledStat.textContent = String(core.potsSpoiled);
   ui.lamp.classList.toggle('is-ready', ready);
   ui.lamp.classList.toggle('is-run', !ready && running);
@@ -609,6 +635,13 @@ function renderStations() {
     pots.some((pot) => pot.status === POT_STATUS.BOTTLING),
   );
   bottler.card.classList.toggle('is-full', pots.length >= bottler.capacity);
+
+  const disposer = stationViews.get('disposer');
+  const wasted = core.getPotsAt('disposer');
+  disposer.slots.replaceChildren(...createSlots(wasted, disposer.capacity));
+  disposer.count.textContent = `${wasted.length} / ${disposer.capacity}`;
+  disposer.card.classList.toggle('is-working', wasted.some((batch) => batch.status === POT_STATUS.DISPOSING));
+  disposer.card.classList.toggle('is-full', wasted.length >= disposer.capacity);
 }
 
 function renderPlan() {
@@ -634,7 +667,8 @@ function stationLabel(id) {
 }
 
 function nextDestination(pot) {
-  if (pot.location === 'bottler') {
+  if (pot.status === POT_STATUS.SPOILED) return { toId: 'disposer', nextIndex: null, process: null };
+  if (pot.location === 'bottler' || pot.location === 'disposer') {
     return null;
   }
 
@@ -666,10 +700,10 @@ function renderHint() {
 
     ui.hint.textContent =
       destination.toId === 'bottler'
-        ? `Pot #${ready.id} is ready at ${stationLabel(
+        ? `Batch #${ready.id} is ready at ${stationLabel(
             ready.location,
           )} — drag it into the BOTTLER before the timer empties.`
-        : `Pot #${ready.id} is ready at ${stationLabel(
+        : `Batch #${ready.id} is ready at ${stationLabel(
             ready.location,
           )} — drag it to ${target} (process ${destination.process.order}) before the timer empties.`;
     return;
@@ -682,26 +716,23 @@ function renderHint() {
     const waiting = active.filter(
       (pot) => pot.status === POT_STATUS.QUEUED,
     ).length;
-    ui.hint.textContent = `Pot #${bottling.id} is emptying onto the vial belt — one pot at a time, ${core.config.bottlingMs / 1000} seconds each.${waiting > 0 ? ` ${waiting} pot${waiting === 1 ? '' : 's'} waiting.` : ''}`;
+    ui.hint.textContent = `Batch #${bottling.id} is bottling — one batch at a time, ${core.config.bottlingMs / 1000} seconds each.${waiting > 0 ? ` ${waiting} batch${waiting === 1 ? '' : 'es'} waiting.` : ''}`;
     return;
   }
 
   if (active.length === 0) {
-    ui.hint.textContent =
-      core.vialsProduced > 0
-        ? `${core.vialsProduced} vials banked. Take another pot from the intake.`
-        : 'Take empty pots from the top-left intake.';
+    ui.hint.textContent = 'Take an empty batch from the depot.';
     return;
   }
 
   if (active.every((pot) => pot.location === 'intake')) {
     ui.hint.textContent =
-      'Drag an empty pot into the GRAIN MILL for process 1.';
+      'Drag an empty batch into the COMMIE MILL for process 1.';
     return;
   }
 
   ui.hint.textContent =
-    'Stations work on their own. Keep every pot moving before its ready timer runs out.';
+    'Stations work on their own. Keep every batch moving before its ready timer runs out.';
 }
 
 function render() {
@@ -1027,7 +1058,7 @@ function onPointerDown(event) {
       pot.status === POT_STATUS.WORKING ||
       pot.status === POT_STATUS.BOTTLING
     ) {
-      toast(`Pot #${pot.id} is still working.`);
+      toast(`Batch #${pot.id} is still working.`);
     }
     return;
   }
@@ -1035,7 +1066,7 @@ function onPointerDown(event) {
   if (embedded) {
     const owner = remoteOwners.get(pot.id);
     if (owner && owner.clientId !== remoteClientId) {
-      toast(`Pot #${pot.id} is claimed by ${owner.name ?? 'another comrade'}.`);
+      toast(`Batch #${pot.id} is claimed by ${owner.name ?? 'another comrade'}.`);
       return;
     }
     sendFactoryAction('claim', { potId: pot.id });
@@ -1084,29 +1115,29 @@ function stationName(id) {
 function rejectionText(event) {
   switch (event.reason) {
     case 'wrong-station':
-      return `Wrong station — that pot needs ${stationName(
+      return `Wrong station — that batch needs ${stationName(
         event.expectedStationId,
       )} for process ${event.process?.order}.`;
     case 'pot-busy':
-      return 'That pot is still being processed.';
+      return 'That batch is still being processed.';
     case 'station-full':
-      return 'That station already holds four pots.';
+      return 'That station already holds four batches.';
     case 'bottler-full':
-      return 'The bottler is full. Wait for a pot to finish.';
+      return 'The bottler is full. Wait for a batch to finish.';
     case 'processes-remaining':
-      return `That pot still needs process ${event.process?.order} at ${stationName(
+      return `That batch still needs process ${event.process?.order} at ${stationName(
         event.process?.stationId,
       )}.`;
     case 'ready-for-bottler':
       return 'All twelve processes are done — drop it in the bottler.';
     case 'already-there':
-      return 'That pot is already at this station.';
+      return 'That batch is already at this station.';
     case 'pot-gone':
-      return 'That pot has already left the line.';
+      return 'That batch has already left the line.';
     case 'unknown-station':
       return 'That is not a station.';
     case 'unknown-pot':
-      return 'Unknown pot.';
+      return 'Unknown batch.';
     default:
       return 'That move is not possible right now.';
   }
@@ -1188,12 +1219,12 @@ function captureSpoiledFx(potId) {
 }
 
 /* Emptied pots ride the lower conveyor away; they never fade in place. */
-function sendPotDownEmpties(potId) {
+function sendPotDownEmpties(potId, facility = 'bottler') {
   if (reduceMotion) {
     return;
   }
 
-  const track = stationViews.get('bottler')?.emptiesTrack;
+  const track = stationViews.get(facility)?.emptiesTrack;
   const el = document.querySelector(
     `.pot[data-pot-id="${potId}"]:not(.drag-ghost)`,
   );
@@ -1232,76 +1263,6 @@ function sendPotDownEmpties(potId) {
   animation.finished.then(() => clone.remove()).catch(() => clone.remove());
 }
 
-/* Vials are released one at a time as the active pot drains. */
-function spawnVial() {
-  if (reduceMotion) {
-    return;
-  }
-
-  const track = stationViews.get('bottler')?.vialTrack;
-  if (!track) {
-    return;
-  }
-
-  const vial = document.createElement('img');
-  vial.src = ASSETS.vial;
-  vial.alt = '';
-  vial.className = 'belt-vial';
-  track.append(vial);
-
-  const travel = track.clientWidth + 40;
-  const duration = Math.max(1100, (travel / 110) * 1000);
-  const animation = vial.animate(
-    [
-      { transform: 'translate(-16px, 0)' },
-      { transform: `translate(${travel}px, 0)` },
-    ],
-    {
-      duration,
-      easing: 'linear',
-      fill: 'forwards',
-    },
-  );
-
-  animation.finished.then(() => vial.remove()).catch(() => vial.remove());
-}
-
-const vialEmitted = new Map();
-
-function vialQuota(progressMs) {
-  const perVial = core.config.bottlingMs / core.config.vialsPerPot;
-  return Math.max(
-    0,
-    Math.min(
-      core.config.vialsPerPot,
-      Math.floor(progressMs / perVial + 1e-6),
-    ),
-  );
-}
-
-function updateBottlingFlow() {
-  const active = core.pots.find(
-    (pot) =>
-      pot.location === 'bottler' && pot.status === POT_STATUS.BOTTLING,
-  );
-
-  if (!active) {
-    return;
-  }
-
-  const emitted = vialQuota(active.progressMs);
-  const previous = vialEmitted.get(active.id) ?? 0;
-
-  if (emitted <= previous) {
-    return;
-  }
-
-  for (let index = previous; index < emitted; index += 1) {
-    spawnVial();
-  }
-  vialEmitted.set(active.id, emitted);
-}
-
 function handleEvents(events) {
   for (const event of events) {
     switch (event.type) {
@@ -1309,21 +1270,14 @@ function handleEvents(events) {
         pulseStation(event.stationId);
         break;
       case 'pot-spoiled':
-        captureSpoiledFx(event.potId);
-        toast(
-          `Pot #${event.potId} spoiled at ${stationLabel(event.stationId)} — the timer ran out.`,
-        );
+        toast(`Batch #${event.potId} wasted at ${stationLabel(event.stationId)}. Route it to disposal.`);
         break;
-      case 'pot-bottled': {
-        const already = vialEmitted.get(event.potId) ?? 0;
-        const remaining = Math.max(0, event.vials - already);
-        for (let index = 0; index < remaining; index += 1) {
-          spawnVial();
-        }
-        vialEmitted.delete(event.potId);
+      case 'batch-disposed':
+        sendPotDownEmpties(event.potId, 'disposer');
+        break;
+      case 'pot-bottled':
         sendPotDownEmpties(event.potId);
         break;
-      }
       default:
         break;
     }
@@ -1374,7 +1328,6 @@ function frame(now) {
       handleEvents(result.events);
     }
 
-    updateBottlingFlow();
 
     if (result.events.length > 0) {
       render();

@@ -32,7 +32,7 @@ Legend: **P0** required for the current prototype to stop using placeholders,
 |---|---|---|---|---|---|
 | Floor tile set (4 variants) | image | `main-game/assets/tiles/floor-*.png` | PNG/WebP | 64×64, tileable | P0 |
 | Wall tile set (edge, corner, fill) | image | `main-game/assets/tiles/wall-*.png` | PNG/WebP | 64×64, tileable | P0 |
-| Vanguard player sprite sheet | image | `main-game/assets/players/vanguard.png` | PNG | 8 directions × 4 frames, 64×64 cells | P0 |
+| Player sprite sheet | image | `main-game/assets/players/player.png` | PNG | 8 directions × 4 frames, 64×64 cells | P0 |
 | Collective player sprite sheet | image | `main-game/assets/players/collective.png` | PNG | 8 directions × 4 frames, 64×64 cells | P0 |
 | Ghost player sprite sheet | image | `main-game/assets/players/ghost.png` | PNG | 4 frames, 64×64 cells, additive | P0 |
 | Team banners / flags | image | `main-game/assets/team/*.svg` | SVG | 256×128 | P1 |
@@ -112,7 +112,7 @@ Legend: **P0** required for the current prototype to stop using placeholders,
 | Pipe set (straight, elbow, T) | image | `dash-supplement-factory/assets/pipes/*.svg` | SVG | 128×128 each | P2 |
 | Liquid splash / bubble | image | `dash-supplement-factory/assets/fx/liquid.png` | PNG | 8 frames, 128×128 | P2 |
 | Steam puff | image | `dash-supplement-factory/assets/fx/steam.png` | PNG | 10 frames, 256×256 | P2 |
-| Spoiled-pot stamp | image | `dash-supplement-factory/assets/fx/spoiled.svg` | SVG | 512×256 | P1 |
+| Wasted-batch stamp | image | `dash-supplement-factory/assets/fx/wasted.svg` | SVG | 512×256 | P1 |
 | Remote-player cursor (4 colours) | image | `shared/assets/cursor-camarade-*.svg` | SVG | 48×48 each | P0 |
 | Pot owner tag / nameplate | image | `shared/assets/nameplate.svg` | SVG | 256×64 | P1 |
 
@@ -161,7 +161,7 @@ Legend: **P0** required for the current prototype to stop using placeholders,
 | Machine hum loop | audio | `dash-supplement-factory/assets/audio/factory-loop.*` | OGG + MP3 | 4 s loop | P1 |
 | Pot pickup / drop | audio | `dash-supplement-factory/assets/audio/pot-*.*` | OGG + MP3 | 150–250 ms | P0 |
 | Station process complete | audio | `dash-supplement-factory/assets/audio/process.*` | OGG + MP3 | 400 ms | P1 |
-| Pot spoiled | audio | `dash-supplement-factory/assets/audio/spoiled.*` | OGG + MP3 | 600 ms | P1 |
+| Batch wasted | audio | `dash-supplement-factory/assets/audio/wasted.*` | OGG + MP3 | 600 ms | P1 |
 | Bottle finished | audio | `dash-supplement-factory/assets/audio/bottle.*` | OGG + MP3 | 700 ms | P1 |
 
 ### Voice / announcer (optional)

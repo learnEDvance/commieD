@@ -465,6 +465,7 @@ export class Room {
         pots: state.factory.pots.filter((pot) => pot.location !== 'exited'),
         stationCapacity: state.factory.stationCapacity,
         bottlerCapacity: state.factory.bottlerCapacity,
+        disposerCapacity: state.factory.disposerCapacity,
         vialsProduced: state.factory.vialsProduced,
         secondsProduced: state.factory.secondsProduced,
         potsBottled: state.factory.potsBottled,

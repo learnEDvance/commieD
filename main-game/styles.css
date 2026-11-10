@@ -506,7 +506,6 @@ body {
   font-weight: 900;
   letter-spacing: 0.04em;
   line-height: 1;
-  text-transform: uppercase;
   text-shadow: 0 3px 0 var(--red-deep), 0 0 30px rgba(194, 42, 47, 0.45);
 }
 

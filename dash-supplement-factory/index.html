@@ -14,7 +14,7 @@
           <div class="floor__grid" aria-hidden="true"></div>
           <svg class="arrows" id="arrows" aria-hidden="true"></svg>
 
-          <section class="intake" id="intake" aria-label="Empty pot intake">
+          <section class="intake" id="intake" aria-label="Empty batch intake">
             <div class="intake__machine">
               <span class="intake__icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24">
@@ -25,13 +25,13 @@
               </span>
               <div class="intake__titles">
                 <span class="intake__eyebrow">COLLECTED TOP LEFT</span>
-                <h2 class="intake__title">EMPTY POTS</h2>
+                <h2 class="intake__title">BATCH DEPOT</h2>
               </div>
               <span class="intake__lamp" aria-hidden="true"></span>
             </div>
             <div class="intake__rack is-empty" id="intake-rack"></div>
             <button class="take-pot" id="take-pot" type="button">
-              <span>TAKE POT</span>
+              <span>TAKE BATCH</span>
               <strong id="empties-count">0</strong>
             </button>
           </section>
@@ -49,10 +49,9 @@
             </header>
 
             <div class="infopanel__stats">
-              <span class="stat">IN PLAY <strong id="active-stat">0</strong></span>
-              <span class="stat">VIALS <strong id="vials-stat">0</strong></span>
-              <span class="stat">DASH <strong id="dash-stat">0s</strong></span>
-              <span class="stat stat--danger">SPOILED <strong id="spoiled-stat">0</strong></span>
+              <span class="stat">PROCESSING <strong id="active-stat">0</strong></span>
+              <span class="stat">DASH AVAILABLE <strong id="dash-stat">0s</strong></span>
+              <span class="stat stat--danger">WASTED <strong id="spoiled-stat">0</strong></span>
             </div>
 
             <div class="infopanel__plan-head">
@@ -62,7 +61,7 @@
             <div class="infopanel__plan" id="plan"></div>
 
             <p class="hint" id="hint" aria-live="polite">
-              Take empty pots, then drag them into the grain mill.
+              Take an empty batch, then drag it into the commie mill.
             </p>
           </aside>
         </div>

@@ -1,10 +1,10 @@
 export const STATIONS = Object.freeze([
-  Object.freeze({ id: 'mill', name: 'GRAIN MILL', short: 'MILL', kind: 'mill' }),
-  Object.freeze({ id: 'vat', name: 'MASH VAT', short: 'VAT', kind: 'vat' }),
-  Object.freeze({ id: 'press', name: 'AGITATOR PRESS', short: 'PRESS', kind: 'press' }),
-  Object.freeze({ id: 'still', name: 'SPIRIT STILL', short: 'STILL', kind: 'still' }),
-  Object.freeze({ id: 'filter', name: 'PURITY FILTER', short: 'FILTER', kind: 'filter' }),
-  Object.freeze({ id: 'bureau', name: 'PLAN BUREAU', short: 'BUREAU', kind: 'bureau' }),
+  Object.freeze({ id: 'mill', name: 'COMMIE MILL', short: 'MILL', kind: 'mill' }),
+  Object.freeze({ id: 'vat', name: 'NATIONAL SPIRIT FERMENTER', short: 'FERMENTER', kind: 'vat' }),
+  Object.freeze({ id: 'press', name: 'VODKA MIXER', short: 'MIXER', kind: 'press' }),
+  Object.freeze({ id: 'still', name: 'PROPAGANDA ADDITION', short: 'ADDITION', kind: 'still' }),
+  Object.freeze({ id: 'filter', name: 'CAPITALIST HATE INFUSER', short: 'INFUSER', kind: 'filter' }),
+  Object.freeze({ id: 'bureau', name: 'INSPECTION', short: 'INSPECTION', kind: 'bureau' }),
 ]);
 
 // Twelve numbered processes. Stations are deliberately reused: a pot visits the
@@ -114,6 +114,8 @@ export const DEFAULT_CONFIG = Object.freeze({
   processes: PROCESSES,
   stationCapacity: 4,
   bottlerCapacity: 4,
+  disposerCapacity: 4,
+  disposingMs: 10000,
   vialsPerPot: 20,
   secondsPerVial: 1,
   bottlingMs: 10000,
@@ -125,6 +127,7 @@ export const POT_STATUS = Object.freeze({
   READY: 'ready',
   QUEUED: 'queued',
   BOTTLING: 'bottling',
+  DISPOSING: 'disposing',
   DONE: 'done',
   SPOILED: 'spoiled',
 });
@@ -185,7 +188,7 @@ function validateConfig(config) {
     }
   }
 
-  for (const key of ['stationCapacity', 'bottlerCapacity', 'vialsPerPot']) {
+  for (const key of ['stationCapacity', 'bottlerCapacity', 'disposerCapacity', 'vialsPerPot']) {
     if (!Number.isInteger(config[key]) || config[key] < 1) {
       throw new RangeError(`${key} must be a positive integer`);
     }
@@ -196,6 +199,9 @@ function validateConfig(config) {
   }
   if (!Number.isFinite(config.bottlingMs) || config.bottlingMs <= 0) {
     throw new RangeError('bottlingMs must be positive');
+  }
+  if (!Number.isFinite(config.disposingMs) || config.disposingMs <= 0) {
+    throw new RangeError('disposingMs must be positive');
   }
 }
 
@@ -270,6 +276,10 @@ export class DashSupplementFactory {
     return this.config.bottlerCapacity;
   }
 
+  get disposerCapacity() {
+    return this.config.disposerCapacity;
+  }
+
   /** Active pots at one station, the intake, or the bottler. */
   getPotsAt(location) {
     return this.#potsAt(location);
@@ -283,6 +293,7 @@ export class DashSupplementFactory {
       result[station.id] = this.#potsAt(station.id).length;
     }
     result.bottler = this.#potsAt('bottler').length;
+    result.disposer = this.#potsAt('disposer').length;
 
     return result;
   }
@@ -332,13 +343,14 @@ export class DashSupplementFactory {
     if (!pot) {
       return this.#rejected('unknown-pot');
     }
-    if (pot.location === 'exited' || pot.status === POT_STATUS.SPOILED) {
+    if (pot.location === 'exited') {
       return this.#rejected('pot-gone');
     }
     if (
       pot.status === POT_STATUS.WORKING ||
       pot.status === POT_STATUS.QUEUED ||
-      pot.status === POT_STATUS.BOTTLING
+      pot.status === POT_STATUS.BOTTLING ||
+      pot.status === POT_STATUS.DISPOSING
     ) {
       return this.#rejected('pot-busy');
     }
@@ -346,6 +358,7 @@ export class DashSupplementFactory {
     if (targetId === 'bottler') {
       return this.#dropAtBottler(pot);
     }
+    if (targetId === 'disposer') return this.#dropAtDisposer(pot);
 
     const station = this.stations.find((candidate) => candidate.id === targetId);
 
@@ -487,6 +500,21 @@ export class DashSupplementFactory {
       this.#promoteQueuedPot(events);
     }
 
+    let disposingRemaining = deltaMs;
+    while (disposingRemaining > 0) {
+      const active = this._pots.find((candidate) => candidate.location === 'disposer' && candidate.status === POT_STATUS.DISPOSING);
+      if (!active) break;
+      const needed = this.config.disposingMs - active.progressMs;
+      if (disposingRemaining < needed) { active.progressMs += disposingRemaining; break; }
+      disposingRemaining -= needed;
+      active.progressMs = this.config.disposingMs;
+      active.location = 'exited';
+      active.status = POT_STATUS.DONE;
+      events.push({ type: 'batch-disposed', potId: active.id });
+      const next = this._pots.find((candidate) => candidate.location === 'disposer' && candidate.status === POT_STATUS.QUEUED);
+      if (next) { next.status = POT_STATUS.DISPOSING; next.progressMs = 0; }
+    }
+
     return this.#tick(deltaMs, events);
   }
 
@@ -579,6 +607,29 @@ export class DashSupplementFactory {
     };
   }
 
+  #dropAtDisposer(pot) {
+    if (!pot.spoiled && pot.status !== POT_STATUS.SPOILED) {
+      return this.#rejected('not-wasted');
+    }
+    if (this.#potsAt('disposer').length >= this.config.disposerCapacity) {
+      return this.#rejected('disposer-full');
+    }
+    const busy = this._pots.some((item) => item.location === 'disposer' && item.status === POT_STATUS.DISPOSING);
+    const from = pot.location;
+    pot.location = 'disposer';
+    pot.status = busy ? POT_STATUS.QUEUED : POT_STATUS.DISPOSING;
+    pot.progressMs = 0;
+    return {
+      type: 'pot-dropped',
+      potId: pot.id,
+      from,
+      to: 'disposer',
+      status: pot.status,
+      stepIndex: pot.stepIndex,
+      step: null,
+    };
+  }
+
   /** Start the next waiting pot in the bottler, if any. */
   #promoteQueuedPot(events) {
     const next = this._pots.find(
@@ -605,7 +656,7 @@ export class DashSupplementFactory {
     const stationId = pot.location;
 
     pot.status = POT_STATUS.SPOILED;
-    pot.location = 'exited';
+    // Wasted batches remain in their station until routed to disposal.
     pot.spoiled = true;
     pot.windowMsLeft = 0;
     pot.progressMs = 0;

@@ -786,6 +786,7 @@ function updateLocalGhostConsole({ force = false } = {}) {
     baseline: countAlive(me.teamId) * TEAM_HP_PER_PLAYER,
     livingTeammates: countAlive(me.teamId),
     ammo: team.ammo,
+    dashSeconds: team.dashSeconds,
     factory: localFactorySnapshot(),
     eliminated,
   });
@@ -820,6 +821,7 @@ function updateNetworkGhostConsole(snapshot) {
     baseline: countAlive(me.teamId) * TEAM_HP_PER_PLAYER,
     livingTeammates: countAlive(me.teamId),
     ammo: team.ammo,
+    dashSeconds: team.dashSeconds,
     factory: snapshot.factories?.[me.teamId] ?? null,
     eliminated,
   });
@@ -1149,6 +1151,7 @@ function drawBullets() {
 
 function drawPlayers(now) {
   for (const player of game.players) {
+    if (!player.alive) continue;
     const team = game.teams[player.teamId];
     const [x, y] = worldToScreen(player.x, player.y);
     const radius = PLAYER_RADIUS * TILE_PX;
@@ -1424,7 +1427,7 @@ function updateComrats() {
     state.className = `comrat__state ${
       !player.alive ? 'is-ghost' : 'is-live'
     }`;
-    state.textContent = player.alive ? 'LIVE' : 'GHOST';
+    state.textContent = player.alive ? 'ALIVE' : `GHOST (${TASK_NAMES[player.ghostTask] ?? 'CLICKER'})`;
 
     item.append(name, state);
     return item;
@@ -1465,14 +1468,6 @@ function updateMinimap() {
   let sourceWidth = game.maze.width;
   let sourceHeight = game.maze.height;
 
-  if (mode === 'NEARBY') {
-    const span = 25;
-    sourceWidth = span;
-    sourceHeight = span;
-    sourceX = clamp(me.x - span / 2, 0, game.maze.width - span);
-    sourceY = clamp(me.y - span / 2, 0, game.maze.height - span);
-  }
-
   minimapCtx.imageSmoothingEnabled = false;
   minimapCtx.drawImage(
     mazeBitmap,
@@ -1501,6 +1496,7 @@ function updateMinimap() {
   }
 
   for (const player of game.players) {
+    if (!player.alive) continue;
     const [x, y] = project(player.x, player.y);
     minimapCtx.globalAlpha = player.alive ? 1 : 0.45;
     minimapCtx.beginPath();
@@ -1532,7 +1528,7 @@ function updateMinimap() {
 
 function sortedTeamPlayers() {
   return game.players
-    .filter((player) => player.teamId === me.teamId)
+    .filter((player) => player.teamId === me.teamId && player.id !== me.id && player.alive)
     .sort((a, b) => Number(b.alive) - Number(a.alive) || a.id - b.id);
 }
 
@@ -1701,16 +1697,13 @@ function drawTeamMap() {
     }
 
     minimapCtx.fillStyle = player.alive ? '#d7cfb9' : '#5f5a4c';
-    const label = player.id === me.id ? 'YOU' : player.name.toUpperCase();
+    const label = player.name.toUpperCase();
     minimapCtx.fillText(label, selected ? 15 : 10, y);
 
     minimapCtx.fillStyle = player.alive ? '#7fc96a' : '#5bc0be';
     minimapCtx.textAlign = 'right';
-    minimapCtx.fillText(
-      player.alive ? 'LIVE' : `GHOST · ${TASK_NAMES[player.ghostTask] ?? 'CLICKER'}`,
-      size - 10,
-      y,
-    );
+    const state = player.alive ? 'ALIVE' : `GHOST (${TASK_NAMES[player.ghostTask] ?? 'CLICKER'})`;
+    minimapCtx.fillText(state, size - 10, y);
     minimapCtx.textAlign = 'left';
   });
 

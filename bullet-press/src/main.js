@@ -121,12 +121,12 @@ function buildTrunk() {
   }
 }
 
-function advanceTrunk() {
+function advanceTrunk(slotIndex) {
   if (trunkBullets.length === 0 || trunkPitch <= 0) {
     return;
   }
 
-  const leaving = trunkBullets.shift();
+  const leaving = trunkBullets.splice(slotIndex, 1)[0];
 
   if (leaving) {
     leaving.dataset.leaving = 'true';
@@ -135,7 +135,8 @@ function advanceTrunk() {
   }
 
   trunkBullets.forEach((bullet, index) => {
-    bullet.style.transform = `translateX(${index * trunkPitch}px)`;
+    const position = index >= slotIndex ? index : index;
+    bullet.style.transform = `translateX(${position * trunkPitch}px)`;
   });
 
   const targetIndex = trunkBullets.length;
@@ -186,7 +187,7 @@ function advanceFeed(feed) {
   const queue = feed.querySelector('.feed__queue');
 
   if (!queue) {
-    return;
+    return null;
   }
 
   const bullets = [...queue.querySelectorAll('.feed__bullet')];
@@ -198,11 +199,8 @@ function advanceFeed(feed) {
 
   const bullet = createFeedBullet();
   bullet.style.transform = 'translateY(0)';
-  bullet.classList.add('is-entering');
-  bullet.addEventListener('animationend', () => {
-    bullet.classList.remove('is-entering');
-  });
   queue.append(bullet);
+  return bullet;
 }
 
 function buildFeeds() {
@@ -340,7 +338,9 @@ function renderCode() {
     codeRow.append(char);
   }
 
-  if (!docked && !core.complete) {
+  if (core.pausedAtMs !== null) {
+    codeStatus.textContent = 'PAUSED · PRESS Q TO RESUME';
+  } else if (!docked && !core.complete) {
     codeStatus.textContent = 'LOADING MAGAZINE…';
   } else if (core.complete) {
     const seconds = (core.lastDurationMs / 1000).toFixed(2);
@@ -392,6 +392,7 @@ function render() {
   renderStats();
   renderCode();
   renderCurrentMagazine();
+  document.body.classList.toggle('is-paused', core.pausedAtMs !== null);
 }
 
 function flyBullet(correct, startRect, endRect) {
@@ -461,20 +462,22 @@ function shiftLine() {
     core.nextMagazine();
     resetFeeds();
     docked = true;
-    core.start(performance.now());
     render();
   }, SHIFT_MS);
 }
 
 function handleInput(char) {
-  if (!docked || core.complete) {
+  if (!docked || core.complete || core.pausedAtMs !== null) {
     return;
   }
 
   const slotIndex = core.index;
   const feed = feedEls[slotIndex];
-  const topBullet = feed?.querySelector('.feed__bullet');
+  const queueBullets = feed?.querySelectorAll('.feed__bullet');
+  const topBullet = queueBullets?.[queueBullets.length - 1];
   const startRect = topBullet?.getBoundingClientRect();
+  const trunkBullet = trunkBullets[slotIndex];
+  const trunkRect = trunkBullet?.getBoundingClientRect();
 
   const event = core.press(char, performance.now());
 
@@ -487,10 +490,9 @@ function handleInput(char) {
     feed?.classList.add('is-wrong');
   }
 
-  if (feed) {
-    advanceFeed(feed);
-  }
-  advanceTrunk();
+  const newFeedBullet = feed ? advanceFeed(feed) : null;
+  const feedTargetRect = newFeedBullet?.getBoundingClientRect();
+  advanceTrunk(slotIndex);
 
   if (core.complete) {
     docked = false;
@@ -503,6 +505,7 @@ function handleInput(char) {
   if (!reduceMotion && startRect && targetRect) {
     flyBullet(event.correct, startRect, targetRect);
   }
+  if (!reduceMotion && trunkRect && feedTargetRect) flyBullet(true, trunkRect, feedTargetRect);
 
   if (core.complete) {
     window.clearTimeout(shiftTimer);
@@ -523,7 +526,7 @@ function tickElapsed() {
   if (core.complete && core.lastDurationMs !== null) {
     elapsedEl.textContent = `${(core.lastDurationMs / 1000).toFixed(2)}s`;
   } else if (docked && core.startedAtMs !== null) {
-    elapsedEl.textContent = `${((performance.now() - core.startedAtMs) / 1000).toFixed(2)}s`;
+    elapsedEl.textContent = `${(core.elapsed(performance.now()) / 1000).toFixed(2)}s`;
   } else {
     elapsedEl.textContent = '—';
   }
@@ -554,6 +557,14 @@ window.addEventListener('keydown', (event) => {
   }
 
   const char = event.key.toUpperCase();
+
+  if (char === 'Q') {
+    event.preventDefault();
+    if (core.pausedAtMs === null) core.pause(performance.now());
+    else core.resume(performance.now());
+    render();
+    return;
+  }
 
   if (!/^[A-Z]$/.test(char)) {
     return;
@@ -590,7 +601,6 @@ window.addEventListener('message', (event) => {
 buildFeeds();
 setupLine();
 docked = true;
-core.start(performance.now());
 render();
 window.requestAnimationFrame(tickElapsed);
 embedPost({ type: 'minigame-ready', game: 'bullet-press' });

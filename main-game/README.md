@@ -12,7 +12,7 @@ Multiplayer (recommended):
 node server/server.js
 ```
 
-Open `http://localhost:8080/main-game/`, pick a name and a collective, and join.
+Open `http://localhost:8080/`, pick a name and a collective, and join.
 The server owns the maze, both teams, the bots, and one shared Dash Supplement
 Factory per team.
 
@@ -23,7 +23,7 @@ Local practice:
 python3 -m http.server 8000
 ```
 
-Open `http://localhost:8000/main-game/?local=1`. This runs the deterministic
+Open `http://localhost:8000/?local=1`. This runs the deterministic
 game in the browser with bots and local minigame contributions. Without
 `?local=1` the page expects the WebSocket server.
 
@@ -49,7 +49,7 @@ snapshots, and match resets.
 | Click / hold | Shoot |
 | `Shift` | Dash |
 | `Space` | Trigger the team special item |
-| `X` | Cycle minimap: nearby → full maze → comrats |
+| `X` | Cycle minimap: full maze → comrats |
 | `↑` / `↓` in comrats | Select a teammate and draw a route |
 | `1` / `2` / `3` | Ghost task: soul / ammo / dash |
 | `R` | New match (local) or request a rematch (online) |

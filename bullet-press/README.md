@@ -39,9 +39,9 @@ From top to bottom:
 
 - A broken magazine awards `x0` because it produces nothing.
 - Production is an integer; `takeMagazines()` returns the whole magazines produced and resets the counter.
-- The timer starts when a magazine reaches the center (`start(nowMs)`), not while it is sliding in.
+- The timer starts on the first valid keypress, so time spent waiting for the magazine does not count.
 - Sequences come from a seeded RNG (or an injected RNG), never `Math.random()`.
-- There is no Q pause; `Q` is a valid sequence character.
+- Press `Q` to pause or resume. The sequence uses A–Z, so Q is not a sequence character.
 
 ## Controls
 
@@ -79,7 +79,7 @@ node --test
 - `BulletPress` exposes `sequence`, `slots`, `index`, `filled`, `complete`, `brokenMagazine`, `multiplierForDuration(durationMs)`, `lastMultiplier`, `lastDurationMs`, `production`, `magazinesProduced`, and `brokenMagazines`.
 - `start(nowMs)` begins the current magazineâ€™s timer once it is docked.
 - `press(char, nowMs)` returns an event with `type` (`correct` / `wrong` / `ignored` / `not-ready`), `slotIndex`, `complete`, `broken`, `multiplier`, `durationMs`, and the current production.
-- `nextMagazine(nowMs)` starts a fresh sequence only after the current magazine is complete. Omit `nowMs` and call `start(nowMs)` when the magazine docks.
+- `nextMagazine(nowMs)` starts a fresh sequence only after the current magazine is complete. A new magazine timer remains idle until its first valid keypress.
 - `takeMagazines()` is the resource-out call for the host game.
 - Sequences are deterministic from a seed or an injected RNG.
 

@@ -76,12 +76,6 @@ async function serveStatic(request, response) {
 
   const url = new URL(request.url, 'http://localhost');
 
-  if (url.pathname === '/') {
-    response.writeHead(302, { Location: '/main-game/' });
-    response.end();
-    return;
-  }
-
   if (url.pathname === '/health') {
     sendJson(response, 200, { ok: true });
     return;
@@ -270,7 +264,7 @@ export function startServer({ port = Number(process.env.PORT) || 8080, host = pr
 
   httpServer.listen(port, host, () => {
     console.log(`commieD server listening on http://${host}:${port}`);
-    console.log(`Open http://localhost:${port}/main-game/`);
+    console.log(`Open http://localhost:${port}/`);
     console.log(`Match seed ${room.game.seed}; ${room.options.teams} teams x ${room.options.playersPerTeam}.`);
   });
 

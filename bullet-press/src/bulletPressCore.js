@@ -66,6 +66,7 @@ export class BulletPress {
     this.brokenMagazine = false;
 
     this.startedAtMs = null;
+    this.pausedAtMs = null;
     this.lastMultiplier = null;
     this.lastDurationMs = null;
 
@@ -103,6 +104,25 @@ export class BulletPress {
     return true;
   }
 
+  pause(nowMs) {
+    if (this.pausedAtMs !== null || !Number.isFinite(nowMs) || this.complete) return false;
+    this.pausedAtMs = nowMs;
+    return true;
+  }
+
+  resume(nowMs) {
+    if (this.pausedAtMs === null || !Number.isFinite(nowMs)) return false;
+    if (this.startedAtMs !== null) this.startedAtMs += Math.max(0, nowMs - this.pausedAtMs);
+    this.pausedAtMs = null;
+    return true;
+  }
+
+  elapsed(nowMs) {
+    if (this.startedAtMs === null) return null;
+    const endpoint = this.pausedAtMs ?? nowMs;
+    return Math.max(0, endpoint - this.startedAtMs);
+  }
+
   multiplierForDuration(durationMs) {
     if (!Number.isFinite(durationMs) || durationMs < 0) {
       return 1;
@@ -124,12 +144,9 @@ export class BulletPress {
    * `nowMs` must come from the host clock; rules never read the wall clock.
    */
   press(input, nowMs) {
+    if (this.pausedAtMs !== null) return { type: 'ignored', reason: 'paused' };
     if (this.complete) {
       return { type: 'ignored', reason: 'complete' };
-    }
-
-    if (this.startedAtMs === null) {
-      return { type: 'not-ready', reason: 'not-started' };
     }
 
     const char = String(input).toUpperCase();
@@ -137,6 +154,9 @@ export class BulletPress {
     if (!/^[A-Z]$/.test(char)) {
       return { type: 'ignored', reason: 'invalid-character' };
     }
+
+    if (!Number.isFinite(nowMs)) return { type: 'ignored', reason: 'invalid-time' };
+    if (this.startedAtMs === null) this.startedAtMs = nowMs;
 
     const expected = this.expectedChar;
     const correct = char === expected;
@@ -183,9 +203,8 @@ export class BulletPress {
   }
 
   /**
-   * Start a fresh magazine once the current one is complete. If `nowMs` is
-   * supplied the next magazine's timer starts immediately; otherwise the host
-   * calls `start(nowMs)` when the magazine docks.
+   * Start a fresh magazine once the current one is complete. The timer begins
+   * on its first valid keypress.
    */
   nextMagazine(nowMs) {
     if (!this.complete) {
@@ -197,7 +216,8 @@ export class BulletPress {
     this.index = 0;
     this.complete = false;
     this.brokenMagazine = false;
-    this.startedAtMs = Number.isFinite(nowMs) ? nowMs : null;
+    this.startedAtMs = null;
+    this.pausedAtMs = null;
 
     return [...this.sequence];
   }

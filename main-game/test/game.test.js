@@ -6,6 +6,8 @@ import {
   GAME_DEFAULTS,
   Game,
   MOVE_SPEED,
+  ENEMY_COLOR,
+  PLAYER_COLORS,
   PLAYER_RADIUS,
   START_AMMO,
   START_DASH_SECONDS,
@@ -47,6 +49,28 @@ test('joining adds players to a team and shares one HP pool', () => {
   assert.equal(game.teams[0].dashSeconds, START_DASH_SECONDS);
   assert.notEqual(first.x, undefined);
   assert.notEqual(second.y, undefined);
+});
+
+test('teammate colours are ten distinct options and exclude enemy red', () => {
+  assert.equal(PLAYER_COLORS.length, 10);
+  assert.equal(new Set(PLAYER_COLORS).size, 10);
+  assert.equal(PLAYER_COLORS.includes(ENEMY_COLOR), false);
+});
+
+test('special items respawn at free map positions after a randomized interval', () => {
+  const game = new Game({ seed: 10, teams: 2, playersPerTeam: 2, width: 41, height: 41 });
+  const initialCount = game.maze.items.length;
+  assert.ok(game.itemRespawnMs >= 15_000 && game.itemRespawnMs <= 60_000);
+
+  for (let elapsed = 0; elapsed <= 60_000 && game.maze.items.length === initialCount; elapsed += 100) {
+    game.step(100);
+  }
+
+  assert.equal(game.maze.items.length, initialCount + 1);
+  const item = game.maze.items.at(-1);
+  assert.equal(isWall(game.maze, item.x, item.y), false);
+  assert.equal(spawnTeamAt(game.maze, item.x, item.y), -1);
+  assert.ok(game.itemRespawnMs >= 15_000 && game.itemRespawnMs <= 60_000);
 });
 
 test('movement is clamped by walls and enemy spawn rooms', () => {
@@ -119,6 +143,73 @@ test('movement is clamped by walls and enemy spawn rooms', () => {
   }
 
   assert.equal(spawnTeamAt(game.maze, Math.floor(player.x), Math.floor(player.y)), -1);
+});
+
+test('movement keeps momentum briefly after input is released', () => {
+  const game = new Game({ seed: 6, teams: 2, playersPerTeam: 2, width: 41, height: 41 });
+  const player = game.join({ teamId: 0 });
+  const startX = player.x;
+
+  stepWith(game, player, { right: true }, 100);
+  const movingX = player.x;
+  const velocity = player.vx;
+  stepWith(game, player, {}, 50);
+
+  assert.ok(movingX > startX);
+  assert.ok(player.x > movingX);
+  assert.ok(player.vx > 0 && player.vx < velocity);
+});
+
+test('teams without ghosts regenerate HP, ammo, and dash once per second', () => {
+  const game = new Game({ seed: 7, teams: 2, playersPerTeam: 2, width: 41, height: 41 });
+  game.join({ teamId: 0 });
+  const team = game.teams[0];
+  team.hp -= 2;
+  const ammo = team.ammo;
+  const dash = team.dashSeconds;
+
+  for (let step = 0; step < 10; step += 1) game.step(100);
+
+  assert.equal(team.hp, team.maxHp);
+  assert.equal(team.ammo, ammo + 10);
+  assert.equal(team.dashSeconds, dash + 1);
+});
+
+test('teams with ghosts do not use normal regeneration', () => {
+  const game = new Game({ seed: 8, teams: 2, playersPerTeam: 3, width: 41, height: 41 });
+  game.join({ teamId: 0 });
+  const ghost = game.join({ teamId: 0 });
+  ghost.alive = false;
+  ghost.isGhost = true;
+  const team = game.teams[0];
+  team.hp -= 2;
+  const resources = { hp: team.hp, ammo: team.ammo, dash: team.dashSeconds };
+
+  for (let step = 0; step < 10; step += 1) game.step(100);
+
+  assert.equal(team.hp, resources.hp);
+  assert.equal(team.ammo, resources.ammo);
+  assert.equal(team.dashSeconds, resources.dash);
+});
+
+test('phaseless recovery relocates a player from a wall to a free tile', () => {
+  const game = new Game({ seed: 9, teams: 2, playersPerTeam: 2, width: 41, height: 41 });
+  const player = game.join({ teamId: 0 });
+  let wall = null;
+  for (let y = 1; y < game.maze.height - 1 && !wall; y += 1) {
+    for (let x = 1; x < game.maze.width - 1 && !wall; x += 1) {
+      if (isWall(game.maze, x, y)) wall = { x, y };
+    }
+  }
+  assert.ok(wall);
+  player.x = wall.x + 0.5;
+  player.y = wall.y + 0.5;
+  game.teams[0].activeEffect = { type: 'phaseless', msLeft: 1 };
+
+  const result = game.step(1);
+
+  assert.equal(isWall(game.maze, Math.floor(player.x), Math.floor(player.y)), false);
+  assert.ok(result.events.some((event) => event.type === 'phase-recovered' && event.playerId === player.id));
 });
 
 test('shooting spends shared ammo and damages the enemy team', () => {

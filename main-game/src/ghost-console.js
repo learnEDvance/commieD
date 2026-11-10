@@ -163,7 +163,7 @@ export class GhostConsole {
       this.status.textContent = 'TEAM ELIMINATED — PRODUCTION HALTED';
     } else if (this.task === 'dash' && this.state?.factory) {
       const factory = this.state.factory;
-      this.status.textContent = `${factory.vialsProduced} VIALS · ${factory.secondsProduced}s DASH BANKED · ${factory.potsSpoiled} SPOILED`;
+      this.status.textContent = `${Math.floor(Number(this.state?.dashSeconds) || 0)}s DASH AVAILABLE · ${factory.potsSpoiled} WASTED`;
     } else if (this.task === 'clicker') {
       this.status.textContent = `TEAM HP ${Number(this.state?.hp ?? 0).toFixed(1)} · ${this.state?.livingTeammates ?? 0} LIVING`;
     } else {
@@ -188,6 +188,7 @@ export class GhostConsole {
         baseline: this.state?.baseline ?? 0,
         livingTeammates: this.state?.livingTeammates ?? 0,
         ammo: this.state?.ammo ?? 0,
+        dashSeconds: this.state?.dashSeconds ?? 0,
         factory: this.task === 'dash' ? this.state?.factory ?? null : null,
         eliminated: Boolean(this.state?.eliminated),
       },

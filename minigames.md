@@ -59,7 +59,7 @@ Purpose: ghosts produce magazines that living teammates load into their guns.
 
 Implemented: `bullet-press/` (ES modules, no dependencies). Tests run with `node --test`.
 
-Layout (top to bottom): sequence presenter → centered full-width magazine line → branch lines → single horizontal feeder. The current magazine sits at the center of the screen, with two empty magazines queued to its left and the previous magazine to its right. The feeder enters from the right and stops at the leftmost branch, so it serves only this station. It sits above the 10 branch layers. Ten vertical branch lines rise from it, one per slot, each carrying a column of bullets up to the magazine. The feeder is clogged while the branches are full: loading a slot pulls the top bullet from its branch into the magazine, refills that branch from the feeder, and indexes the feeder forward by exactly one bullet. Bullets and feed lines are centered on their slots. Magazine and sequence objects use a 5% larger scale.
+Layout (top to bottom): sequence presenter → centered full-width magazine line → branch lines → single horizontal feeder. The current magazine sits at the center of the screen, with two empty magazines queued to its left and the previous magazine to its right. The feeder enters from the right and stops at the leftmost branch, so it serves only this station. It sits above the 10 branch layers. Ten vertical branch lines rise from it, one per slot, each carrying a column of bullets up to the magazine. The feeder is clogged while the branches are full. The bullet aligned with the used branch rises from the main feeder into that branch, while the remaining feeder bullets advance to fill its gap. The top branch bullet, closest to the magazine, loads into the magazine; the rest move up and a new bullet enters at the bottom from the main feeder. Bullets and feed lines are centered on their slots. Magazine and sequence objects use a 5% larger scale.
 
 Rules as implemented:
 
@@ -77,7 +77,7 @@ Rules as implemented:
   - `≤ 800 ms/key` → `x3`
   - `≤ 1100 ms/key` → `x2`
   - slower → `x1`
-- The timer starts when the magazine docks, not while it slides in.
+- The timer starts on the first valid keypress, not while the magazine waits or slides in. Q pauses and resumes the minigame.
 - Production is an integer; `takeMagazines()` returns whole magazines to the host.
 - Sequences come from a seeded RNG (or an injected RNG), never `Math.random()`.
 
@@ -89,7 +89,7 @@ Assumed (change if wrong):
 - Speed is the only multiplier input; accuracy only decides perfect vs broken.
 - A broken magazine awards `x0` because it produces nothing.
 - The speed thresholds are placeholders for playtesting.
-- No Q pause; `Q` is a valid sequence character.
+- The timer excludes paused time; Q is not in the A�Z sequence.
 
 Open questions:
 
@@ -115,82 +115,20 @@ Open questions:
 
 ## 4. Dash Supplement Factory
 
-Purpose: a station-management factory game that produces dash seconds.
+Purpose: ghosts produce dash seconds for their team's shared reserve.
 
-Implemented: `dash-supplement-factory/src/dashSupplementFactoryCore.js` (pure rules, no DOM or wall-clock), `test/dashSupplementFactoryCore.test.js` (21 tests), and a browser shell in `dash-supplement-factory/` (`index.html`, `styles.css`, `src/main.js`, `src/assets.js`, `assets/bottle.svg`, `assets/vial.svg`). Run it with `python3 -m http.server 8002` from the module folder.
+Implemented: deterministic rules in `dash-supplement-factory/src/dashSupplementFactoryCore.js` with a browser shell in `dash-supplement-factory/`. Run its tests with `node --test` from that module folder.
 
-Flow:
+Flow and stations:
 
-1. Take unlimited empty pots from the top-left intake.
-2. Drag each pot into the station for its current numbered process.
-3. The station processes automatically. Move the pot before its ready window expires.
-4. Repeat through twelve processes over six reusable stations.
-5. After process 12, drag the pot into the bottom-right bottler.
-6. Bottling produces 20 vials of one-second dash; vials leave right, emptied pots leave bottom.
+- Take unlimited empty batches from the depot and drag each batch through twelve numbered processes across six reusable stations: Commie Mill, National Spirit Fermenter, Vodka Mixer, Propaganda Addition, Capitalist Hate Infuser, and Inspection.
+- Each processing station holds four batches. A batch must visit the station for its current process. Work is automatic; a wrong-station drop is rejected.
+- Each process completion opens a ready window, shown by a circular timer that shifts from green to yellow to red. If the timer expires, the batch becomes waste and remains at its station until manually moved to disposal.
+- After process 12 finishes, the batch can be moved to the bottler. The bottler holds four batches and empties them one at a time over ten seconds.
+- Wasted batches can be moved to disposal. Disposal empties batches one at a time and sends the empty container away on the conveyor.
+- A bottled batch contributes 20 seconds of dash. The factory panel displays the team's currently available dash seconds, not a lifetime production total.
+- The interface shows PROCESSING, DASH AVAILABLE, and WASTED; it does not show vials or a production log.
+- The six processing stations are aligned, display no 2�2 label, and the floor is titled DASUP FACTORY.
+- The core uses an explicit host clock and returns resource events; it does not own the main-game loop or global state.
 
-Layout:
-
-- Intake top left.
-- Six separate stations with 2×2 slot grids and machine protrusions: mill, vat, press, still, filter, bureau.
-- Bottler bottom right.
-- Info panel bottom left with title, live stats, the full numbered process plan, and the current hint.
-- Dynamic route arrows run from each pot's station to its next required station and are labelled with the process number.
-
-Processes as implemented:
-
-| # | Process | Station | Work | Window |
-| --- | --- | --- | --- | --- |
-| 1 | Seize the Harvest | Mill | 1500 ms | 7000 ms |
-| 2 | Nationalize the Mash | Vat | 1400 ms | 7000 ms |
-| 3 | Agitate the Masses | Press | 1200 ms | 6500 ms |
-| 4 | Distill the Spirit | Still | 1900 ms | 6500 ms |
-| 5 | Collectivize the Vat | Vat | 1500 ms | 7000 ms |
-| 6 | Purge Deviations | Filter | 1400 ms | 6500 ms |
-| 7 | Ratify the Plan | Bureau | 1200 ms | 7000 ms |
-| 8 | Five-Year Ferment | Still | 2100 ms | 6500 ms |
-| 9 | Commissar's Blend | Vat | 1500 ms | 7000 ms |
-| 10 | Inspect the Cadre | Bureau | 1300 ms | 6500 ms |
-| 11 | Filter the Line | Filter | 1700 ms | 6500 ms |
-| 12 | Seal the Revolution | Press | 1400 ms | 7000 ms |
-
-The vat is used three times; the still, filter, bureau, and press twice; the mill once.
-
-Rules as implemented:
-
-- The intake is unlimited.
-- Each station holds four pots in a 2×2 grid. A fifth drop is rejected and stays at its source.
-- A pot can only enter the station for its current process. Wrong-station drops are rejected without losing the pot.
-- Stations process automatically; a working pot cannot leave.
-- A finished process opens a ready window. If the window empties, the pot spoils, leaves the station, and frees its slot.
-- Process 12 must finish before the bottler accepts the pot.
-- The bottler holds four pots and empties them one at a time over `10000 ms` each; waiting pots queue, and only the active pot's liquid drains visibly.
-- One pot produces 20 vials; one vial is one second of dash.
-- Vials are only awarded when bottling finishes. Vials appear one at a time during the drain and ride the upper outfeed belt; the emptied pot rides the lower belt away without fading.
-- The core is deterministic and replayable; the browser owns the clock and reports deltas.
-
-Core interface:
-
-- Mutations: `takePot()`, `dropPot(potId, targetId)`, `advance(deltaMs)`.
-- Output: `takeVials()`, `takeSeconds()`, `takeBottles()` alias.
-- State: `processes`, `stations`, `pots`, `activePots`, `intakePots`, `occupancy`, `vialsProduced`, `secondsProduced`, `potsBottled`, `potsSpoiled`, `elapsedMs`, `stationCapacity`, `bottlerCapacity`.
-- `dropPot()` returns `pot-dropped` or `rejected` (`wrong-station`, `station-full`, `bottler-full`, `pot-busy`, `processes-remaining`, `pot-gone`).
-- `advance()` returns a tick with ordered `events` (`process-complete`, `pot-spoiled`, `pot-bottled`).
-
-Browser shell as built:
-
-- Separate station cards with no belt between stations. Each card has a machine protrusion and four slots. The bottler has two short outfeed belts: vials above, empties below.
-- Pointer drag-and-drop from the intake or a ready station to the next station or bottler.
-- Gold arrows show the next hop for ready pots; dashed arrows show the hop still processing.
-- The bottom-left panel shows title, IN PLAY / VIALS / DASH / SPOILED, all twelve numbered processes, and a live hint.
-- Pots show a process badge, fill level, work progress, and a ready-window timer.
-- Bottling takes ten seconds per pot and drains its liquid visibly, then streams vial sprites off the right edge; emptied pots fall off the bottom edge.
-- Wrong drops raise a toast; spoiled pots are removed and counted.
-- The line never ends or batches; play continues as long as the player takes pots.
-
-Open questions:
-
-- Confirm one pot should yield 20 one-second vials.
-- Tune the process durations and ready windows through playtesting.
-- Confirm wrong-station drops should be free rather than spoiling or delaying the pot.
-- Decide whether the six-station, twelve-process plan is the final route.
-- Integrate `takeVials()` / `takeSeconds()` with the host speed resource.
+Process work durations and ready windows remain adjustable playtesting values. The main game integrates the factory output with the shared team dash reserve.

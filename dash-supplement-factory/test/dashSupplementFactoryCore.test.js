@@ -97,6 +97,7 @@ test('starts with an empty floor and no output', () => {
     filter: 0,
     bureau: 0,
     bottler: 0,
+    disposer: 0,
   });
 });
 
@@ -242,7 +243,7 @@ test('stations can process different steps of the route at once', () => {
   assert.equal(factory.pots[1].status, POT_STATUS.WORKING);
 });
 
-test('an uncollected ready pot spoils and frees its slot', () => {
+test('an uncollected ready batch stays in its station until disposal', () => {
   const factory = makeFactory(FAST_CONFIG);
   takePots(factory, 1);
   finishSingleProcess(factory, 1);
@@ -257,10 +258,27 @@ test('an uncollected ready pot spoils and frees its slot', () => {
   assert.equal(late.events[0].type, 'pot-spoiled');
   assert.equal(late.events[0].reason, 'window');
   assert.equal(factory.pots[0].status, POT_STATUS.SPOILED);
-  assert.equal(factory.pots[0].location, 'exited');
-  assert.equal(factory.occupancy.mill, 0);
-  assert.equal(factory.activePots.length, 0);
+  assert.equal(factory.pots[0].location, 'mill');
+  assert.equal(factory.occupancy.mill, 1);
+  assert.equal(factory.activePots.length, 1);
   assert.equal(factory.potsSpoiled, 1);
+});
+
+test('wasted batches queue at disposal and leave only when emptying finishes', () => {
+  const factory = makeFactory({ ...FAST_CONFIG, disposingMs: 300 });
+  takePots(factory, 2);
+  finishSingleProcess(factory, 1);
+  finishSingleProcess(factory, 2);
+  factory.advance(300);
+  factory.advance(300);
+
+  assert.equal(factory.dropPot(1, 'disposer').status, POT_STATUS.DISPOSING);
+  assert.equal(factory.dropPot(2, 'disposer').status, POT_STATUS.QUEUED);
+  assert.equal(factory.getPotsAt('disposer').length, 2);
+  const tick = factory.advance(600);
+  assert.deepEqual(tick.events.map((event) => event.type), ['batch-disposed', 'batch-disposed']);
+  assert.equal(factory.getPotsAt('disposer').length, 0);
+  assert.equal(factory.activePots.length, 0);
 });
 
 test('the full route reuses stations and ends at the bottler', () => {

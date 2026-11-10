@@ -53,8 +53,8 @@ test('a default magazine fills after 10 keys', () => {
 
   assert.equal(event.complete, true);
   assert.equal(core.filled, 10);
-  assert.equal(event.multiplier, 4);
-  assert.equal(core.production, 4);
+  assert.equal(event.multiplier, 5);
+  assert.equal(core.production, 5);
 });
 
 test('ignores digits and punctuation without breaking the magazine', () => {
@@ -89,13 +89,14 @@ test('starts a magazine timer once', () => {
   assert.equal(core.startedAtMs, 1_000);
 });
 
-test('refuses input before the magazine timer starts', () => {
+test('starts the timer on the first valid key without a dock timer', () => {
   const core = makeCore();
 
-  const event = core.press('A');
+  const event = core.press('A', 500);
 
-  assert.equal(event.type, 'not-ready');
-  assert.equal(core.filled, 0);
+  assert.equal(event.type, 'correct');
+  assert.equal(core.startedAtMs, 500);
+  assert.equal(core.filled, 1);
 });
 
 test('correct keys fill green slots in order', () => {
@@ -148,8 +149,8 @@ test('a perfect magazine awards a whole speed multiplier', () => {
 test('slower magazines award lower whole multipliers', () => {
   const cases = [
     { durationMs: 1_500, multiplier: 5 },
-    { durationMs: 2_500, multiplier: 4 },
-    { durationMs: 3_500, multiplier: 3 },
+    { durationMs: 2_500, multiplier: 5 },
+    { durationMs: 3_500, multiplier: 4 },
     { durationMs: 5_000, multiplier: 2 },
     { durationMs: 7_000, multiplier: 1 },
   ];
@@ -170,11 +171,11 @@ test('multiplier uses the average time across the magazine', () => {
   const core = makeCore();
   core.start(1_000);
 
-  // 2.5 seconds total for 5 keys = 500ms average -> 4x.
+  // 2.5 seconds total for 5 keys = 500ms average -> 5x.
   const event = fill(core, 'A', 1_000, 625);
 
   assert.equal(event.durationMs, 2_500);
-  assert.equal(event.multiplier, 4);
+  assert.equal(event.multiplier, 5);
 });
 
 test('a broken magazine produces nothing and increments the broken count', () => {
@@ -222,11 +223,11 @@ test('nextMagazine resets the magazine but keeps production', () => {
   assert.equal(core.filled, 0);
   assert.deepEqual(core.slots, []);
   assert.equal(core.index, 0);
-  assert.equal(core.startedAtMs, 2_000);
+  assert.equal(core.startedAtMs, null);
   assert.equal(core.production, 5);
 });
 
-test('nextMagazine without a timestamp waits for start()', () => {
+test('nextMagazine waits for the first keypress to start its timer', () => {
   const core = makeCore();
   core.start(0);
   fill(core, 'A', 100, 100);
@@ -234,11 +235,20 @@ test('nextMagazine without a timestamp waits for start()', () => {
   core.nextMagazine();
 
   assert.equal(core.startedAtMs, null);
-  assert.equal(core.press('A', 500).type, 'not-ready');
-
-  core.start(1_000);
-
+  assert.equal(core.startedAtMs, null);
   assert.equal(core.press('A', 1_100).type, 'correct');
+  assert.equal(core.startedAtMs, 1_100);
+});
+
+test('Q pause freezes a started timer and ignores keys until resumed', () => {
+  const core = makeCore();
+  core.press('A', 100);
+  assert.equal(core.pause(600), true);
+  assert.equal(core.elapsed(5_000), 500);
+  assert.equal(core.press('A', 5_000).reason, 'paused');
+  assert.equal(core.resume(5_000), true);
+  assert.equal(core.press('A', 5_100).type, 'correct');
+  assert.equal(core.elapsed(5_100), 600);
 });
 
 test('ignores input once the magazine is complete', () => {

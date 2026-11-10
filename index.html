@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>commieD</title>
+  </head>
+  <body>
+    <p>Opening <a href="./main-game/">commieD</a>…</p>
+    <script>
+      const destination = new URL('./main-game/', window.location.href);
+      destination.search = window.location.search;
+      destination.hash = window.location.hash;
+      window.location.replace(destination);
+    </script>
+  </body>
+</html>
