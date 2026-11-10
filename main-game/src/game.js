@@ -740,6 +740,17 @@ export class Game {
       return;
     }
 
+    if (this.#hasEffect(team, 'coat')) {
+      events.push({
+        type: 'damage-blocked',
+        teamId,
+        sourceTeamId,
+        amount,
+        effect: 'coat',
+      });
+      return;
+    }
+
     team.hp = Math.max(0, team.hp - amount);
     events.push({
       type: 'damage',
@@ -758,6 +769,7 @@ export class Game {
     const living = this.players.filter(
       (player) => player.teamId === team.id && player.alive,
     );
+    const keepCount = Math.floor(living.length / 2);
 
     if (sourceTeamId !== undefined && sourceTeamId !== team.id) {
       this.teams[sourceTeamId].kills += 1;
@@ -771,15 +783,18 @@ export class Game {
 
     events.push({ type: 'team-downed', teamId: team.id, wasAlive: living.length });
 
-    if (living.length <= 2) {
+    // A team that would come back with a single player is eliminated instead:
+    // the spec ends a team when its living count reaches one.
+    if (keepCount < 2) {
       team.eliminated = true;
       team.hp = 0;
+      team.maxHp = 0;
       team.activeEffect = null;
       events.push({ type: 'team-eliminated', teamId: team.id });
+      this.#checkWinner(events);
       return;
     }
 
-    const keepCount = Math.floor(living.length / 2);
     const shuffled = this.rng.shuffle([...living]);
     const kept = shuffled.slice(0, keepCount);
 
@@ -802,6 +817,19 @@ export class Game {
       hp: team.hp,
       maxHp: team.maxHp,
     });
+  }
+
+  #checkWinner(events) {
+    if (this.winnerTeamId !== null) {
+      return;
+    }
+
+    const remaining = this.teams.filter((team) => !team.eliminated);
+
+    if (remaining.length === 1 && this.teams.length > 1) {
+      this.winnerTeamId = remaining[0].id;
+      events.push({ type: 'match-over', winnerTeamId: this.winnerTeamId });
+    }
   }
 
   #tickEffect(team, dt, events) {

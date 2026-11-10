@@ -156,6 +156,29 @@ test('the gun-plus effect doubles bullet damage', () => {
   assert.equal(game.teams[1].hp, TEAM_HP_PER_PLAYER - 2);
 });
 
+test('coat blocks all incoming damage while active', () => {
+  const game = new Game({ seed: 18, teams: 2, playersPerTeam: 2, width: 41, height: 41 });
+  const shooter = game.join({ teamId: 0 });
+  const target = game.join({ teamId: 1 });
+
+  const room = game.maze.spawns[0];
+  shooter.x = room.x + 1.5;
+  shooter.y = room.y + 1.5;
+  target.x = shooter.x + 1;
+  target.y = shooter.y;
+  game.teams[1].activeEffect = { type: 'coat', msLeft: 20000 };
+
+  const result = stepWith(
+    game,
+    shooter,
+    { shoot: true, aimX: target.x, aimY: target.y },
+    16,
+  );
+
+  assert.equal(game.teams[1].hp, TEAM_HP_PER_PLAYER);
+  assert.ok(result.events.some((event) => event.type === 'damage-blocked'));
+});
+
 test('dashing spends the shared dash reserve', () => {
   const game = new Game({ seed: 10, teams: 2, playersPerTeam: 2, width: 41, height: 41 });
   const player = game.join({ teamId: 0 });
@@ -324,6 +347,62 @@ test('a team at two players is eliminated instead of revived', () => {
   assert.equal(game.teams[0].eliminated, true);
   assert.equal(game.teams[0].hp, 0);
   assert.equal(game.players.filter((player) => player.teamId === 0 && player.alive).length, 0);
+});
+
+test('a three-player team is eliminated because revival would leave one', () => {
+  const game = new Game({ seed: 19, teams: 2, playersPerTeam: 4, width: 41, height: 41 });
+  const first = game.join({ teamId: 0 });
+  game.join({ teamId: 0 });
+  game.join({ teamId: 0 });
+  const enemy = game.join({ teamId: 1 });
+
+  const spot = findOpenTile(game.maze);
+  first.x = spot.x + 0.5;
+  first.y = spot.y + 0.5;
+  game.teams[0].hp = 1;
+
+  game.bullets.push({
+    id: 999,
+    teamId: 1,
+    ownerId: enemy.id,
+    x: first.x,
+    y: first.y,
+    vx: 0,
+    vy: 0,
+    lifeMs: 500,
+    damage: 1,
+  });
+
+  const result = game.step(16);
+
+  assert.equal(game.teams[0].eliminated, true);
+  assert.equal(game.players.filter((player) => player.teamId === 0 && player.alive).length, 0);
+  assert.equal(game.players.filter((player) => player.teamId === 0 && player.isGhost).length, 3);
+  assert.equal(game.winnerTeamId, 1);
+  assert.ok(result.events.some((event) => event.type === 'match-over'));
+});
+
+test('contribute banks minigame resources for the whole team', () => {
+  const game = new Game({ seed: 20, teams: 2, playersPerTeam: 2, width: 41, height: 41 });
+  game.join({ teamId: 0 });
+
+  const hp = game.teams[0].hp;
+  const ammo = game.teams[0].ammo;
+  const dashSeconds = game.teams[0].dashSeconds;
+
+  const result = game.contribute(0, { hp: 50, ammo: 12, dashSeconds: 3 });
+
+  assert.deepEqual(result, { accepted: true, hp: 50, ammo: 12, dashSeconds: 3 });
+  assert.equal(game.teams[0].hp, hp + 50);
+  assert.equal(game.teams[0].ammo, ammo + 12);
+  assert.equal(game.teams[0].dashSeconds, dashSeconds + 3);
+  assert.throws(() => game.contribute(0, { hp: -1 }), RangeError);
+
+  game.teams[0].eliminated = true;
+  assert.deepEqual(game.contribute(0, { hp: 10 }), {
+    accepted: false,
+    reason: 'eliminated',
+  });
 });
 
 test('ghosts ignore walls and can switch tasks', () => {

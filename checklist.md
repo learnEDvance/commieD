@@ -83,3 +83,24 @@ Tick only verified work. One small step at a time.
 - [ ] Confirm wrong-station drops should stay free
 - [ ] Integrate `takeVials()` / `takeSeconds()` with the host speed resource
 - [ ] Replace placeholder art
+
+## Main Game
+
+- [x] Deterministic three-pass maze: spawn rooms, carved maze, special items
+- [x] Shared team HP, ammo, dash, and special-item queue
+- [x] Movement, dash, aiming, shooting, bombs, and damage
+- [x] Special items: bomb, +HP, +speed, gun+, phaseless, +coat
+- [x] Ghost movement through walls and 1/2/3 task switching
+- [x] Team wipe revives half the living players; survivors become ghosts
+- [x] A team is eliminated when revival would leave one player (and the last team wins)
+- [x] `+coat` blocks all incoming damage for its duration
+- [x] Local browser shell: maze camera, minimap modes, stats, comrats, reserves, health, toasts
+- [x] COMRATS arrow-key teammate selection draws a route in the world
+- [x] Outcome banner shows victory, defeat, or elimination and starts hidden
+- [x] `Game#contribute()` host hook for ghost-minigame HP/ammo/dash rewards
+- [x] Unit tests for maze generation, combat, specials, revival, elimination, winner, and contributions
+- [x] Browser smoke test: HUD regions, minimap modes, comrat route, reserves, fresh match, no page errors
+- [ ] Authoritative multiplayer server, lobby, and city sharding
+- [ ] Embed the ghost minigames and connect them to `contribute()`
+- [ ] Load-test for large concurrent matches
+- [ ] Replace placeholder visuals with final art

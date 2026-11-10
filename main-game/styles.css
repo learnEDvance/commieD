@@ -385,6 +385,10 @@ body {
   pointer-events: none;
 }
 
+.banner[hidden] {
+  display: none;
+}
+
 .banner strong {
   color: var(--red-soft);
   font-size: 22px;
@@ -395,6 +399,14 @@ body {
   color: var(--muted);
   font-size: 9px;
   letter-spacing: 0.14em;
+}
+
+.banner.is-good {
+  border-color: #3f6334;
+}
+
+.banner.is-good strong {
+  color: #b9eaa6;
 }
 
 @keyframes toast-in {

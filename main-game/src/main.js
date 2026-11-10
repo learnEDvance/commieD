@@ -76,6 +76,8 @@ let viewHeight = window.innerHeight;
 let specialRequested = false;
 let ghostTaskKey = null;
 let effects = [];
+let routeTargetId = null;
+let routePath = [];
 let lastFrame = 0;
 let fpsFrames = 0;
 let fpsTime = 0;
@@ -126,7 +128,10 @@ function startMatch(seed) {
   mouse.down = false;
   specialRequested = false;
   ghostTaskKey = null;
+  routeTargetId = me.id;
+  routePath = [];
   ui.banner.hidden = true;
+  ui.banner.className = 'banner';
   comratsNext = 0;
   hudNext = 0;
 }
@@ -239,7 +244,7 @@ function frame(now) {
   }
 
   render(now);
-  updateHud(now);
+  updateHud(now, delta);
 }
 
 function handleEvents(events) {
@@ -314,15 +319,35 @@ function handleEvents(events) {
           toast(`${EFFECT_NAMES[event.effect] ?? event.effect} EXPIRED`);
         }
         break;
+      case 'damage-blocked':
+        if (event.teamId === me.teamId) {
+          toast('+COAT ABSORBED THE HIT', 'good');
+        }
+        break;
+      case 'ghost-task':
+        if (event.playerId === me.id) {
+          toast(`GHOST TASK — ${TASK_NAMES[event.task] ?? event.task}`, 'good');
+        }
+        break;
+      case 'match-over': {
+        const won = event.winnerTeamId === me.teamId;
+        showBanner(
+          won ? 'VICTORY' : 'DEFEAT',
+          won ? 'LAST TEAM STANDING' : `${game.teams[event.winnerTeamId].name.toUpperCase()} HOLDS THE MAZE`,
+          won ? 'good' : 'bad',
+        );
+        break;
+      }
       default:
         break;
     }
   }
 }
 
-function showBanner(title, text) {
+function showBanner(title, text, tone = 'bad') {
   ui.bannerTitle.textContent = title;
   ui.bannerText.textContent = text;
+  ui.banner.className = `banner${tone === 'good' ? ' is-good' : ''}`;
   ui.banner.hidden = false;
 }
 
@@ -348,6 +373,7 @@ function render(now) {
 
   drawTiles();
   drawSpawnZones();
+  drawRoute();
   drawItems(now);
   drawBombs(now);
   drawBullets();
@@ -417,6 +443,47 @@ function drawSpawnZones() {
     ctx.textBaseline = 'bottom';
     ctx.fillText(`${team.name.toUpperCase()} SPAWN`, x + 3, y - 4);
   }
+}
+
+function drawRoute() {
+  if (
+    MINIMAP_MODES[minimapModeIndex] !== 'COMRATS' ||
+    routeTargetId === null ||
+    routeTargetId === me.id ||
+    routePath.length < 2
+  ) {
+    return;
+  }
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(242, 201, 76, 0.72)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([7, 7]);
+  ctx.beginPath();
+
+  routePath.forEach((point, index) => {
+    const [x, y] = worldToScreen(point.x, point.y);
+    if (index === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  });
+
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  const target = game.playersById.get(routeTargetId);
+  if (target) {
+    const [x, y] = worldToScreen(target.x, target.y);
+    ctx.beginPath();
+    ctx.arc(x, y, 13, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(242, 201, 76, 0.8)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  ctx.restore();
 }
 
 function drawItems(now) {
@@ -613,8 +680,8 @@ function drawCrosshair() {
 
 /* ---------- HUD ---------- */
 
-function updateHud(now) {
-  updateEffects(now);
+function updateHud(now, delta) {
+  updateEffects(delta);
 
   if (now >= hudNext) {
     hudNext = now + 120;
@@ -630,8 +697,7 @@ function updateHud(now) {
   }
 }
 
-function updateEffects(now) {
-  const delta = lastFrame === 0 ? 16 : Math.min(100, now - lastFrame);
+function updateEffects(delta) {
   effects = effects.filter((effect) => {
     effect.life -= delta;
     return effect.life > 0;
@@ -698,7 +764,15 @@ function updateHealth() {
     ui.effectLabel.textContent = 'NO EFFECT';
   }
 
-  if (team.eliminated) {
+  if (game.winnerTeamId !== null) {
+    const won = game.winnerTeamId === me.teamId;
+    ui.statusLabel.textContent = won ? 'VICTORY' : 'DEFEAT';
+    showBanner(
+      won ? 'VICTORY' : 'DEFEAT',
+      won ? 'LAST TEAM STANDING' : `${game.teams[game.winnerTeamId].name.toUpperCase()} HOLDS THE MAZE`,
+      won ? 'good' : 'bad',
+    );
+  } else if (team.eliminated) {
     ui.statusLabel.textContent = 'ELIMINATED';
     showBanner('ELIMINATED', 'Press R for a new match');
   } else if (!me.alive) {
@@ -761,6 +835,7 @@ function updateMinimap() {
   const mode = MINIMAP_MODES[minimapModeIndex];
 
   if (mode === 'COMRATS') {
+    refreshRoute();
     drawTeamMap();
     return;
   }
@@ -836,24 +911,179 @@ function updateMinimap() {
   }
 }
 
+function sortedTeamPlayers() {
+  return game.players
+    .filter((player) => player.teamId === me.teamId)
+    .sort((a, b) => Number(b.alive) - Number(a.alive) || a.id - b.id);
+}
+
+function selectComrat(delta) {
+  const teamPlayers = sortedTeamPlayers();
+  if (teamPlayers.length === 0) {
+    return;
+  }
+
+  let index = teamPlayers.findIndex((player) => player.id === routeTargetId);
+  if (index === -1) {
+    index = 0;
+  }
+  index = (index + delta + teamPlayers.length) % teamPlayers.length;
+  routeTargetId = teamPlayers[index].id;
+  refreshRoute();
+
+  const target = game.playersById.get(routeTargetId);
+  toast(
+    routeTargetId === me.id
+      ? 'ROUTE — YOU'
+      : `ROUTE → ${target.name.toUpperCase()}${target.alive ? '' : ' (GHOST)'}`,
+    'good',
+  );
+}
+
+function refreshRoute() {
+  const target = game.playersById.get(routeTargetId);
+  routePath = target ? findRoute(me, target) : [];
+}
+
+function findRoute(from, to) {
+  if (!from || !to || from.id === to.id) {
+    return [];
+  }
+
+  // Ghosts pass through walls, so a straight line is the honest route.
+  if (from.isGhost) {
+    return [
+      { x: from.x, y: from.y },
+      { x: to.x, y: to.y },
+    ];
+  }
+
+  const { width, height } = game.maze;
+  const startX = clamp(Math.floor(from.x), 0, width - 1);
+  const startY = clamp(Math.floor(from.y), 0, height - 1);
+  let goalX = clamp(Math.floor(to.x), 0, width - 1);
+  let goalY = clamp(Math.floor(to.y), 0, height - 1);
+
+  if (isWall(game.maze, goalX, goalY)) {
+    const near = nearestFreeTile(goalX, goalY, 3);
+    if (!near) {
+      return [];
+    }
+    goalX = near.x;
+    goalY = near.y;
+  }
+
+  const keyOf = (x, y) => y * width + x;
+  const startKey = keyOf(startX, startY);
+  const goalKey = keyOf(goalX, goalY);
+  const cameFrom = new Map([[startKey, null]]);
+  const queue = [[startX, startY]];
+  let head = 0;
+  let found = startKey === goalKey;
+
+  while (head < queue.length && !found) {
+    const [x, y] = queue[head];
+    head += 1;
+
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const nextX = x + dx;
+      const nextY = y + dy;
+      const key = keyOf(nextX, nextY);
+
+      if (nextX < 0 || nextY < 0 || nextX >= width || nextY >= height) {
+        continue;
+      }
+      if (cameFrom.has(key)) {
+        continue;
+      }
+      if (isWall(game.maze, nextX, nextY)) {
+        continue;
+      }
+
+      const owner = spawnTeamAt(game.maze, nextX, nextY);
+      if (owner !== -1 && owner !== from.teamId) {
+        continue;
+      }
+
+      cameFrom.set(key, keyOf(x, y));
+
+      if (key === goalKey) {
+        found = true;
+        break;
+      }
+
+      queue.push([nextX, nextY]);
+    }
+  }
+
+  if (!found) {
+    return [];
+  }
+
+  const path = [];
+  let cursor = goalKey;
+
+  while (cursor !== null) {
+    const x = cursor % width;
+    const y = Math.floor(cursor / width);
+    path.push({ x: x + 0.5, y: y + 0.5 });
+    cursor = cameFrom.get(cursor);
+  }
+
+  path.reverse();
+  path[0] = { x: from.x, y: from.y };
+  path[path.length - 1] = { x: to.x, y: to.y };
+  return path;
+}
+
+function nearestFreeTile(x, y, radius) {
+  for (let ring = 0; ring <= radius; ring += 1) {
+    for (let dy = -ring; dy <= ring; dy += 1) {
+      for (let dx = -ring; dx <= ring; dx += 1) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) {
+          continue;
+        }
+        const nextX = x + dx;
+        const nextY = y + dy;
+        if (!isWall(game.maze, nextX, nextY)) {
+          return { x: nextX, y: nextY };
+        }
+      }
+    }
+  }
+  return null;
+}
+
 function drawTeamMap() {
   const size = MINIMAP_SIZE;
   minimapCtx.fillStyle = '#0b0906';
   minimapCtx.fillRect(0, 0, size, size);
 
-  const rows = game.players
-    .filter((player) => player.teamId === me.teamId)
-    .sort((a, b) => Number(b.alive) - Number(a.alive) || a.id - b.id);
+  const rows = sortedTeamPlayers();
 
   minimapCtx.font = '8px "Trebuchet MS", sans-serif';
   minimapCtx.textAlign = 'left';
   minimapCtx.textBaseline = 'middle';
 
   rows.forEach((player, index) => {
-    const y = 20 + index * 20;
+    const y = 36 + index * 17;
+    const selected = player.id === routeTargetId;
+
+    if (selected) {
+      minimapCtx.fillStyle = 'rgba(242, 201, 76, 0.13)';
+      minimapCtx.fillRect(5, y - 8, size - 10, 16);
+      minimapCtx.fillStyle = '#f2c94c';
+      minimapCtx.fillText('>', 7, y);
+    }
+
     minimapCtx.fillStyle = player.alive ? '#d7cfb9' : '#5f5a4c';
     const label = player.id === me.id ? 'YOU' : player.name.toUpperCase();
-    minimapCtx.fillText(label, 10, y);
+    minimapCtx.fillText(label, selected ? 15 : 10, y);
 
     minimapCtx.fillStyle = player.alive ? '#7fc96a' : '#5bc0be';
     minimapCtx.textAlign = 'right';
@@ -867,9 +1097,13 @@ function drawTeamMap() {
 
   minimapCtx.strokeStyle = 'rgba(242, 201, 76, 0.2)';
   minimapCtx.beginPath();
-  minimapCtx.moveTo(8, 28);
-  minimapCtx.lineTo(size - 8, 28);
+  minimapCtx.moveTo(8, 27);
+  minimapCtx.lineTo(size - 8, 27);
   minimapCtx.stroke();
+
+  minimapCtx.fillStyle = '#706b5b';
+  minimapCtx.font = '7px "Trebuchet MS", sans-serif';
+  minimapCtx.fillText('↑ ↓ SELECT ROUTE', 10, size - 10);
 }
 
 function clamp(value, min, max) {
@@ -890,12 +1124,27 @@ window.addEventListener('keydown', (event) => {
     event.preventDefault();
   }
 
+  if (
+    minimapModeIndex === 2 &&
+    (event.code === 'ArrowUp' || event.code === 'ArrowDown')
+  ) {
+    selectComrat(event.code === 'ArrowDown' ? 1 : -1);
+    return;
+  }
+
   keys.add(event.code);
 
   if (event.code === 'Space') {
     specialRequested = true;
   } else if (event.code === 'KeyX') {
     minimapModeIndex = (minimapModeIndex + 1) % MINIMAP_MODES.length;
+    if (minimapModeIndex === 2) {
+      if (!game.playersById.has(routeTargetId)) {
+        routeTargetId = me.id;
+      }
+      refreshRoute();
+      toast('COMRATS — ↑ ↓ SELECT ROUTE', 'good');
+    }
   } else if (event.code === 'KeyR') {
     startMatch(Math.floor(Math.random() * 1_000_000_000));
   } else if (event.code === 'Digit1') {
