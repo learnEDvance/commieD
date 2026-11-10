@@ -1,5 +1,5 @@
 import { BotDirector } from './bots.js';
-import { EMPTY_INPUT, Game, PLAYER_RADIUS } from './game.js';
+import { EMPTY_INPUT, Game, PLAYER_RADIUS, TEAM_HP_PER_PLAYER } from './game.js';
 import { GhostConsole } from './ghost-console.js';
 import { NetClient, defaultWebSocketUrl } from './net.js';
 import { TILE, isWall, spawnTeamAt } from './maze.js';
@@ -734,7 +734,7 @@ function updateLocalGhostConsole({ force = false } = {}) {
     task: ghostTaskKey ?? me.ghostTask ?? 'clicker',
     hp: team.hp,
     maxHp: team.maxHp,
-    baseline: team.maxHp,
+    baseline: countAlive(me.teamId) * TEAM_HP_PER_PLAYER,
     livingTeammates: countAlive(me.teamId),
     ammo: team.ammo,
     factory: localFactorySnapshot(),
@@ -768,7 +768,7 @@ function updateNetworkGhostConsole(snapshot) {
     task: ghostTaskKey ?? me.ghostTask ?? 'clicker',
     hp: team.hp,
     maxHp: team.maxHp,
-    baseline: team.maxHp,
+    baseline: countAlive(me.teamId) * TEAM_HP_PER_PLAYER,
     livingTeammates: countAlive(me.teamId),
     ammo: team.ammo,
     factory: snapshot.factories?.[me.teamId] ?? null,
