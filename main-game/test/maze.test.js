@@ -146,6 +146,57 @@ test('every spawn room is reachable through the maze', () => {
   }
 });
 
+test('every free tile belongs to a two-by-two open block', () => {
+  for (const options of [
+    { width: 61, height: 61, teams: 2, playersPerTeam: 1, seed: 3 },
+    { width: 51, height: 51, teams: 3, playersPerTeam: 4, seed: 11 },
+    { width: 71, height: 71, teams: 4, playersPerTeam: 8, seed: 21 },
+  ]) {
+    const maze = generateMaze(options);
+
+    for (let y = 0; y < maze.height; y += 1) {
+      for (let x = 0; x < maze.width; x += 1) {
+        if (maze.tiles[y * maze.width + x] !== TILE.FREE) {
+          continue;
+        }
+
+        const hasBlock =
+          (x + 1 < maze.width &&
+            y + 1 < maze.height &&
+            maze.tiles[y * maze.width + x + 1] === TILE.FREE &&
+            maze.tiles[(y + 1) * maze.width + x] === TILE.FREE &&
+            maze.tiles[(y + 1) * maze.width + x + 1] === TILE.FREE) ||
+          (x > 0 &&
+            y + 1 < maze.height &&
+            maze.tiles[y * maze.width + x - 1] === TILE.FREE &&
+            maze.tiles[(y + 1) * maze.width + x] === TILE.FREE &&
+            maze.tiles[(y + 1) * maze.width + x - 1] === TILE.FREE) ||
+          (x + 1 < maze.width &&
+            y > 0 &&
+            maze.tiles[y * maze.width + x + 1] === TILE.FREE &&
+            maze.tiles[(y - 1) * maze.width + x] === TILE.FREE &&
+            maze.tiles[(y - 1) * maze.width + x + 1] === TILE.FREE) ||
+          (x > 0 &&
+            y > 0 &&
+            maze.tiles[y * maze.width + x - 1] === TILE.FREE &&
+            maze.tiles[(y - 1) * maze.width + x] === TILE.FREE &&
+            maze.tiles[(y - 1) * maze.width + x - 1] === TILE.FREE);
+
+        assert.ok(hasBlock, `tile ${x},${y} is not part of a 2x2 open block`);
+      }
+    }
+  }
+});
+
+test('a one-player spawn room is still two-by-two', () => {
+  const maze = generateMaze({ width: 31, height: 31, teams: 2, playersPerTeam: 1, seed: 5 });
+
+  for (const room of maze.spawns) {
+    assert.ok(room.width >= 2);
+    assert.ok(room.height >= 2);
+  }
+});
+
 test('special items spawn on free maze tiles outside spawn rooms', () => {
   const itemsPerTeam = 5;
   const teams = 3;

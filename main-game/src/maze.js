@@ -151,7 +151,7 @@ export function generateMaze(options = {}) {
   // A corridor between every pair of rooms guarantees the spawns connect
   // even when the maze pass leaves a room sealed by walls.
   for (let index = 1; index < spawns.length; index += 1) {
-    connectRooms(tiles, width, spawns[index - 1], spawns[index]);
+    connectRooms(tiles, width, height, spawns[index - 1], spawns[index]);
   }
 
   const items = scatterItems(rng, {
@@ -174,7 +174,8 @@ export function generateMaze(options = {}) {
 }
 
 function placeSpawnZones(rng, width, height, teams, playersPerTeam) {
-  const area = Math.max(2, playersPerTeam * 2);
+  // Every room is at least 2x2 so no player ever stands in a one-tile pocket.
+  const area = Math.max(4, playersPerTeam * 2);
   const { width: roomWidth, height: roomHeight } = bestRectangle(area);
   const zones = [];
 
@@ -222,32 +223,51 @@ function rectsOverlap(a, b, padding) {
 }
 
 function carveMaze(rng, tiles, width, height) {
-  const startX = 1;
-  const startY = 1;
-  const stack = [[startX, startY]];
-  const directions = [
-    [0, -2],
-    [0, 2],
-    [-2, 0],
-    [2, 0],
-  ];
+  // Cells are 2x2 open rooms separated by one-tile walls, so every corridor
+  // and junction is two tiles wide. Cell starts sit on 1 + 3 * index.
+  const CELL_STEP = 3;
+  const CELL_SIZE = 2;
+  const cols = Math.floor((width - 4) / CELL_STEP) + 1;
+  const rows = Math.floor((height - 4) / CELL_STEP) + 1;
+  const cellX = (col) => 1 + col * CELL_STEP;
+  const cellY = (row) => 1 + row * CELL_STEP;
+  const keyOf = (col, row) => row * cols + col;
+  const visited = new Set([keyOf(0, 0)]);
+  const stack = [[0, 0]];
 
-  tiles[startY * width + startX] = TILE.FREE;
+  const carveCell = (col, row) => {
+    const startX = cellX(col);
+    const startY = cellY(row);
+
+    for (let y = 0; y < CELL_SIZE; y += 1) {
+      for (let x = 0; x < CELL_SIZE; x += 1) {
+        tiles[(startY + y) * width + startX + x] = TILE.FREE;
+      }
+    }
+  };
+
+  carveCell(0, 0);
 
   while (stack.length > 0) {
-    const [x, y] = stack[stack.length - 1];
+    const [col, row] = stack[stack.length - 1];
     const options = [];
 
-    for (const [dx, dy] of directions) {
-      const nextX = x + dx;
-      const nextY = y + dy;
+    for (const [dc, dr] of [
+      [0, -1],
+      [0, 1],
+      [-1, 0],
+      [1, 0],
+    ]) {
+      const nextCol = col + dc;
+      const nextRow = row + dr;
 
-      if (nextX <= 0 || nextY <= 0 || nextX >= width - 1 || nextY >= height - 1) {
+      if (nextCol < 0 || nextRow < 0 || nextCol >= cols || nextRow >= rows) {
         continue;
       }
-      if (tiles[nextY * width + nextX] === TILE.WALL) {
-        options.push([nextX, nextY, dx, dy]);
+      if (visited.has(keyOf(nextCol, nextRow))) {
+        continue;
       }
+      options.push([nextCol, nextRow, dc, dr]);
     }
 
     if (options.length === 0) {
@@ -255,10 +275,31 @@ function carveMaze(rng, tiles, width, height) {
       continue;
     }
 
-    const [nextX, nextY, dx, dy] = options[rng.int(options.length)];
-    tiles[(y + dy / 2) * width + (x + dx / 2)] = TILE.FREE;
-    tiles[nextY * width + nextX] = TILE.FREE;
-    stack.push([nextX, nextY]);
+    const [nextCol, nextRow, dc, dr] = options[rng.int(options.length)];
+
+    // Remove the one-tile wall between the two 2x2 cells. Because the wall is
+    // carved for both rows (or both columns), the opening stays two tiles wide.
+    if (dc === 1) {
+      for (let y = 0; y < CELL_SIZE; y += 1) {
+        tiles[(cellY(row) + y) * width + cellX(col) + CELL_SIZE] = TILE.FREE;
+      }
+    } else if (dc === -1) {
+      for (let y = 0; y < CELL_SIZE; y += 1) {
+        tiles[(cellY(row) + y) * width + cellX(col) - 1] = TILE.FREE;
+      }
+    } else if (dr === 1) {
+      for (let x = 0; x < CELL_SIZE; x += 1) {
+        tiles[(cellY(row) + CELL_SIZE) * width + cellX(col) + x] = TILE.FREE;
+      }
+    } else if (dr === -1) {
+      for (let x = 0; x < CELL_SIZE; x += 1) {
+        tiles[(cellY(row) - 1) * width + cellX(col) + x] = TILE.FREE;
+      }
+    }
+
+    carveCell(nextCol, nextRow);
+    visited.add(keyOf(nextCol, nextRow));
+    stack.push([nextCol, nextRow]);
   }
 }
 
@@ -270,31 +311,36 @@ function carveRoom(tiles, width, room) {
   }
 }
 
-function connectRooms(tiles, width, from, to) {
+/** First index of a 2-wide band that still contains `center`, keeping a wall at the border. */
+function bandStart(center, size) {
+  return Math.min(Math.max(center, 1), size - 3);
+}
+
+function connectRooms(tiles, width, height, from, to) {
   const fromX = from.x + Math.floor(from.width / 2);
   const fromY = from.y + Math.floor(from.height / 2);
   const toX = to.x + Math.floor(to.width / 2);
   const toY = to.y + Math.floor(to.height / 2);
 
-  carveHorizontal(tiles, width, fromX, toX, fromY);
-  carveVertical(tiles, width, fromY, toY, toX);
+  // Both arms are two tiles thick. The horizontal arm spans the source room to
+  // the destination column band, the vertical arm spans the horizontal band to
+  // the destination room, and the overlap is a 2x2 corner.
+  const row = bandStart(fromY, height);
+  const column = bandStart(toX, width);
+  const left = Math.min(fromX, column);
+  const right = Math.max(fromX, column) + 1;
+  const top = Math.min(row, toY);
+  const bottom = Math.max(row + 1, toY);
+
+  carveRectangle(tiles, width, left, row, right, row + 1);
+  carveRectangle(tiles, width, column, top, column + 1, bottom);
 }
 
-function carveHorizontal(tiles, width, x1, x2, y) {
-  const start = Math.min(x1, x2);
-  const end = Math.max(x1, x2);
-
-  for (let x = start; x <= end; x += 1) {
-    tiles[y * width + x] = TILE.FREE;
-  }
-}
-
-function carveVertical(tiles, width, y1, y2, x) {
-  const start = Math.min(y1, y2);
-  const end = Math.max(y1, y2);
-
-  for (let y = start; y <= end; y += 1) {
-    tiles[y * width + x] = TILE.FREE;
+function carveRectangle(tiles, width, left, top, right, bottom) {
+  for (let y = top; y <= bottom; y += 1) {
+    for (let x = left; x <= right; x += 1) {
+      tiles[y * width + x] = TILE.FREE;
+    }
   }
 }
 
