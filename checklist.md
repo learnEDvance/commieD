@@ -17,7 +17,7 @@ Tick only verified work. One small step at a time.
 - [x] Shape spawn loop every 10–30 seconds; click grants `+5 HP`
 - [x] Q pauses/resumes; HP, CPS window, and shape timers freeze
 - [x] Run instructions and URL parameters documented in `soul-clicker/README.md`
-- [ ] Integrate with the host team HP/resource API (waiting on host game)
+- [x] Integrate with the host team HP/resource API (signed HP; low CPS drains the team)
 - [ ] Replace dummy assets with final art
 
 ## Bullet Press
@@ -51,7 +51,7 @@ Tick only verified work. One small step at a time.
 - [x] Run instructions and rules documented in `bullet-press/README.md`
 - [ ] Tune the speed thresholds through playtesting
 - [ ] Confirm broken magazines should award `x0`
-- [ ] Integrate `takeMagazines()` with the host magazine/resource API (waiting on host game)
+- [x] Integrate clean magazines with the host ammo resource (`10 × multiplier`)
 - [ ] Replace placeholder rectangles with final art
 
 ## Stewed Luck
@@ -81,12 +81,14 @@ Tick only verified work. One small step at a time.
 - [x] Browser smoke test: layout, intake, drag, wrong station, full route, sequential bottling, vial belt, empty-pot belt, spoilage
 - [ ] Tune process durations and ready windows through playtesting
 - [ ] Confirm wrong-station drops should stay free
-- [ ] Integrate `takeVials()` / `takeSeconds()` with the host speed resource
+- [x] Share one authoritative factory per team; ghosts see each other's pots, claims, and cursors
+- [x] Award 20 seconds of team dash for every bottled pot
 - [ ] Replace placeholder art
 
 ## Main Game
 
 - [x] Deterministic three-pass maze: spawn rooms, carved maze, special items
+- [x] Two-tile-wide corridors and connectors; spawn rooms are at least 2×2
 - [x] Shared team HP, ammo, dash, and special-item queue
 - [x] Movement, dash, aiming, shooting, bombs, and damage
 - [x] Special items: bomb, +HP, +speed, gun+, phaseless, +coat
@@ -98,9 +100,17 @@ Tick only verified work. One small step at a time.
 - [x] COMRATS arrow-key teammate selection draws a route in the world
 - [x] Outcome banner shows victory, defeat, or elimination and starts hidden
 - [x] `Game#contribute()` host hook for ghost-minigame HP/ammo/dash rewards
+- [x] `Game#drainHp()` hook for the Soul Clicker low-CPS penalty
 - [x] Unit tests for maze generation, combat, specials, revival, elimination, winner, and contributions
 - [x] Browser smoke test: HUD regions, minimap modes, comrat route, reserves, fresh match, no page errors
-- [ ] Authoritative multiplayer server, lobby, and city sharding
-- [ ] Embed the ghost minigames and connect them to `contribute()`
+- [x] One communist palette shared by the main game and every minigame (`shared/theme.css`)
+- [x] Asset manifest covering images, video, audio, and fonts (`assets-needed.md`)
+- [x] Authoritative dependency-free Node server, raw WebSocket room, bots, and snapshots
+- [x] Lobby with comrade name and collective choice; humans replace bots
+- [x] Ghost console embeds one minigame at a time and relays contributions
+- [x] One shared Dash Supplement Factory per team with claims, cursors, and bottling rewards
+- [x] Server tests: WebSocket codec, room joins, ghost-only contributions, factories, reset
+- [ ] Browser smoke test of the unified host, lobby, ghost console, and minigame bridge
+- [ ] City sharding
 - [ ] Load-test for large concurrent matches
 - [ ] Replace placeholder visuals with final art
