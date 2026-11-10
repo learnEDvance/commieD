@@ -11,6 +11,7 @@ import { GhostConsole } from './ghost-console.js';
 import { NetClient, defaultWebSocketUrl } from './net.js';
 import { TILE, isWall, spawnTeamAt } from './maze.js';
 import { DashSupplementFactory } from '../../dash-supplement-factory/src/dashSupplementFactoryCore.js';
+import { bulletTrailVector } from './render-utils.js';
 
 const params = new URLSearchParams(window.location.search);
 let NETWORK = params.get('local') !== '1';
@@ -1135,9 +1136,7 @@ function drawBullets() {
 
   for (const bullet of game.bullets) {
     const [x, y] = worldToScreen(bullet.x, bullet.y);
-    const length = Math.hybatch(bullet.vx, bullet.vy) || 1;
-    const trailX = (bullet.vx / length) * 10;
-    const trailY = (bullet.vy / length) * 10;
+    const { x: trailX, y: trailY } = bulletTrailVector(bullet.vx, bullet.vy);
 
     ctx.strokeStyle = '#f8e7ab';
     ctx.lineWidth = 2;
