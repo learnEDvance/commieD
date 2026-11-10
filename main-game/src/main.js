@@ -1,7 +1,12 @@
 import { BotDirector } from './bots.js';
 import { EMPTY_INPUT, Game, PLAYER_RADIUS } from './game.js';
+import { GhostConsole } from './ghost-console.js';
+import { NetClient, defaultWebSocketUrl } from './net.js';
 import { TILE, isWall, spawnTeamAt } from './maze.js';
+import { DashSupplementFactory } from '../../dash-supplement-factory/src/dashSupplementFactoryCore.js';
 
+const params = new URLSearchParams(window.location.search);
+const NETWORK = params.get('local') !== '1';
 const TILE_PX = 30;
 const MINIMAP_SIZE = 180;
 const LOCAL_TEAM = 0;
@@ -9,6 +14,7 @@ const PLAYERS_PER_TEAM = 4;
 const LOCAL_AMMO = 900;
 const ITEMS_PER_TEAM = 8;
 const MINIMAP_MODES = ['NEARBY', 'FULL', 'COMRATS'];
+const INPUT_INTERVAL_MS = 50;
 
 const ITEM_META = Object.freeze({
   bomb: { label: 'B', name: 'BOMB', color: '#e23b3b' },
@@ -60,6 +66,13 @@ const ui = {
     conn: document.querySelector('[data-stat="conn"]'),
     alive: document.querySelector('[data-stat="alive"]'),
   },
+  lobby: document.getElementById('lobby'),
+  lobbyName: document.getElementById('lobby-name'),
+  lobbyTeams: document.getElementById('lobby-teams'),
+  lobbyJoin: document.getElementById('lobby-join'),
+  lobbyStatus: document.getElementById('lobby-status'),
+  ghostOpen: document.getElementById('ghost-open'),
+  ghostConsole: document.getElementById('ghost-console'),
 };
 
 const keys = new Set();
@@ -68,6 +81,18 @@ const mouse = { x: 0, y: 0, down: false };
 let game;
 let me;
 let bots;
+let localFactory;
+let net;
+let myClientId = null;
+let myPlayerId = null;
+let networkTeams = [];
+let networkStatus = NETWORK ? 'CONNECTING' : 'LOCAL';
+let networkJoined = false;
+let lobbyTeamId = 0;
+let cameraReady = false;
+let inputNext = 0;
+let ghostConsole;
+let ghostConsoleVisible = true;
 let mazeBitmap;
 let minimapModeIndex = 0;
 let camera = { x: 0, y: 0 };
@@ -97,7 +122,7 @@ function resize() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
-function startMatch(seed) {
+function startLocalMatch(seed) {
   game = new Game({
     seed,
     teams: 2,
@@ -122,16 +147,20 @@ function startMatch(seed) {
   }
 
   bots = new BotDirector(game, { seed: (seed ^ 0x5f3759df) >>> 0 });
+  localFactory = new DashSupplementFactory();
   buildMazeBitmap();
   camera = { x: me.x, y: me.y };
+  cameraReady = true;
   effects = [];
   mouse.down = false;
   specialRequested = false;
   ghostTaskKey = null;
+  ghostConsoleVisible = true;
   routeTargetId = me.id;
   routePath = [];
   ui.banner.hidden = true;
   ui.banner.className = 'banner';
+  ui.lobby.hidden = true;
   comratsNext = 0;
   hudNext = 0;
 }
@@ -194,7 +223,7 @@ function screenToWorld(x, y) {
 }
 
 function playerInput() {
-  const aim = screenToWorld(mouse.x, mouse.y);
+  const aim = NETWORK && me ? networkAim() : screenToWorld(mouse.x, mouse.y);
 
   return {
     ...EMPTY_INPUT,
@@ -208,6 +237,16 @@ function playerInput() {
     dash: keys.has('ShiftLeft') || keys.has('ShiftRight'),
     useSpecial: specialRequested,
     ghostTask: ghostTaskKey,
+  };
+}
+
+function networkAim() {
+  if (!me) {
+    return { x: 0, y: 0 };
+  }
+  return {
+    x: camera.x + (mouse.x - viewWidth / 2) / TILE_PX,
+    y: camera.y + (mouse.y - viewHeight / 2) / TILE_PX,
   };
 }
 
@@ -226,15 +265,24 @@ function frame(now) {
     fpsTime = 0;
   }
 
-  if (!document.hidden && game) {
-    const inputs = bots.inputs();
-    if (me) {
-      inputs.set(me.id, playerInput());
-    }
+  if (!document.hidden) {
+    if (NETWORK) {
+      if (networkJoined && me) {
+        interpolateNetwork();
+        sendNetworkInput(now);
+      }
+    } else if (game) {
+      const inputs = bots.inputs();
+      if (me) {
+        inputs.set(me.id, playerInput());
+      }
 
-    const result = game.step(delta, inputs);
-    handleEvents(result.events);
-    specialRequested = false;
+      const result = game.step(delta, inputs);
+      handleEvents(result.events);
+      specialRequested = false;
+      advanceLocalFactory(delta);
+      updateLocalGhostConsole();
+    }
   }
 
   if (me) {
@@ -245,6 +293,488 @@ function frame(now) {
 
   render(now);
   updateHud(now, delta);
+}
+
+function sendNetworkInput(now) {
+  if (now < inputNext || !net) {
+    return;
+  }
+  inputNext = now + INPUT_INTERVAL_MS;
+
+  const input = playerInput();
+  net.send({ type: 'input', ...input });
+  specialRequested = false;
+}
+
+function interpolateNetwork() {
+  const factor = 0.35;
+
+  for (const player of game.players) {
+    player.x += (player.targetX - player.x) * factor;
+    player.y += (player.targetY - player.y) * factor;
+    const diff = Math.atan2(
+      Math.sin(player.targetAngle - player.angle),
+      Math.cos(player.targetAngle - player.angle),
+    );
+    player.angle += diff * factor;
+  }
+
+  for (const bullet of game.bullets) {
+    bullet.x += (bullet.targetX - bullet.x) * 0.5;
+    bullet.y += (bullet.targetY - bullet.y) * 0.5;
+  }
+
+  for (const bomb of game.bombs) {
+    bomb.x += (bomb.targetX - bomb.x) * 0.5;
+    bomb.y += (bomb.targetY - bomb.y) * 0.5;
+  }
+}
+
+function advanceLocalFactory(delta) {
+  if (!localFactory || !game || !me) {
+    return;
+  }
+
+  const result = localFactory.advance(delta);
+
+  for (const event of result.events) {
+    if (event.type === 'pot-bottled') {
+      game.contribute(me.teamId, { dashSeconds: event.seconds });
+      toast(`DASH SUPPLEMENT BOTTLED — +${event.seconds}s TO THE TEAM`, 'good');
+    }
+  }
+}
+
+/* ---------- Network host ---------- */
+
+function createNetworkView(maze) {
+  return {
+    maze: { ...maze, items: [] },
+    teams: networkTeams.map((team) => ({
+      ...team,
+      hp: 0,
+      maxHp: 0,
+      ammo: 0,
+      dashSeconds: 0,
+      specials: [],
+      activeEffect: null,
+      kills: 0,
+      eliminated: false,
+    })),
+    players: [],
+    playersById: new Map(),
+    bullets: [],
+    bombs: [],
+    winnerTeamId: null,
+    timeMs: 0,
+  };
+}
+
+function connectNetwork() {
+  net = new NetClient({
+    url: defaultWebSocketUrl(),
+    onStatus: setNetworkStatus,
+    onMessage: handleNetMessage,
+  });
+  net.connect();
+}
+
+function setNetworkStatus(status) {
+  const previous = networkStatus;
+  networkStatus = status;
+
+  if (!networkJoined) {
+    if (ui.lobbyStatus) {
+      ui.lobbyStatus.textContent =
+        status === 'ONLINE'
+          ? 'THE COLLECTIVE IS READY'
+          : status === 'CONNECTING'
+            ? 'CONNECTING TO THE COLLECTIVE…'
+            : 'SERVER OFFLINE — RETRYING…';
+      ui.lobbyStatus.classList.toggle('is-error', status === 'OFFLINE');
+    }
+    return;
+  }
+
+  if (status === 'OFFLINE' && previous !== 'OFFLINE') {
+    toast('CONNECTION LOST — RECONNECTING', 'bad');
+  } else if (status === 'ONLINE' && previous === 'OFFLINE') {
+    toast('RECONNECTED TO THE COLLECTIVE', 'good');
+  }
+}
+
+function setupLobby() {
+  if (!NETWORK) {
+    return;
+  }
+
+  ui.lobbyName.value = window.localStorage.getItem('commied-name') ?? '';
+  ui.lobbyJoin.addEventListener('click', joinNetwork);
+  ui.lobbyName.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      joinNetwork();
+    }
+  });
+}
+
+function joinNetwork() {
+  const name = ui.lobbyName.value.trim();
+
+  if (!name) {
+    ui.lobbyStatus.textContent = 'A COMRADE NEEDS A NAME';
+    ui.lobbyStatus.classList.add('is-error');
+    ui.lobbyName.focus();
+    return;
+  }
+
+  window.localStorage.setItem('commied-name', name);
+  ui.lobbyJoin.disabled = true;
+  ui.lobbyStatus.classList.remove('is-error');
+  ui.lobbyStatus.textContent = 'JOINING THE COLLECTIVE…';
+  net.join({ name, teamId: lobbyTeamId });
+}
+
+function renderLobbyTeams() {
+  if (!ui.lobbyTeams || networkTeams.length === 0) {
+    return;
+  }
+
+  const buttons = networkTeams.map((team) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'lobby__team';
+    button.dataset.team = String(team.id);
+    button.style.borderColor = team.color;
+    button.classList.toggle('is-selected', team.id === lobbyTeamId);
+
+    const name = document.createElement('strong');
+    name.textContent = team.name.toUpperCase();
+    name.style.color = team.color;
+    const hint = document.createElement('small');
+    hint.textContent = team.id === lobbyTeamId ? 'SELECTED' : 'CHOOSE';
+    button.append(name, hint);
+
+    button.addEventListener('click', () => {
+      lobbyTeamId = team.id;
+      renderLobbyTeams();
+    });
+
+    return button;
+  });
+
+  ui.lobbyTeams.replaceChildren(...buttons);
+}
+
+function handleNetMessage(message) {
+  switch (message.type) {
+    case 'hello':
+      networkTeams = message.teams ?? [];
+      renderLobbyTeams();
+      break;
+    case 'welcome':
+      myClientId = message.clientId;
+      myPlayerId = message.playerId;
+      networkJoined = true;
+      game = createNetworkView(message.maze);
+      me = null;
+      mazeBitmap = null;
+      buildMazeBitmap();
+      cameraReady = false;
+      routeTargetId = myPlayerId;
+      routePath = [];
+      ghostTaskKey = null;
+      ghostConsoleVisible = true;
+      effects = [];
+      ui.lobby.hidden = true;
+      ui.banner.hidden = true;
+      ui.banner.className = 'banner';
+      ui.stats.conn.textContent = 'ONLINE';
+      hudNext = 0;
+      comratsNext = 0;
+      break;
+    case 'snapshot':
+      applyNetworkSnapshot(message.snapshot);
+      break;
+    case 'join-rejected':
+      ui.lobby.hidden = false;
+      ui.lobbyJoin.disabled = false;
+      ui.lobbyStatus.textContent = `JOIN FAILED — ${String(message.reason ?? 'UNKNOWN').toUpperCase()}`;
+      ui.lobbyStatus.classList.add('is-error');
+      break;
+    case 'spectating':
+      ui.lobby.hidden = false;
+      ui.lobbyJoin.disabled = false;
+      ui.lobbyStatus.textContent = 'THE TEAMS ARE FULL — TRY AGAIN AFTER THE RESET';
+      ui.lobbyStatus.classList.add('is-error');
+      networkJoined = false;
+      break;
+    case 'contribution-rejected':
+      break;
+    case 'factory-reject':
+      if (message.reason && message.reason !== 'not-a-ghost') {
+        toast(`FACTORY — ${String(message.reason).replaceAll('-', ' ').toUpperCase()}`);
+      }
+      break;
+    default:
+      break;
+  }
+}
+
+function applyNetworkSnapshot(snapshot) {
+  if (!game) {
+    return;
+  }
+
+  const previous = game.playersById;
+  const players = snapshot.players.map((player) => {
+    const old = previous?.get(player.id);
+    return {
+      ...player,
+      x: old ? old.x : player.x,
+      y: old ? old.y : player.y,
+      angle: old ? old.angle : player.angle,
+      targetX: player.x,
+      targetY: player.y,
+      targetAngle: player.angle,
+    };
+  });
+
+  const previousBullets = new Map(game.bullets.map((bullet) => [bullet.id, bullet]));
+  const previousBombs = new Map(game.bombs.map((bomb) => [bomb.id, bomb]));
+
+  game = {
+    maze: { ...game.maze, items: snapshot.items },
+    teams: snapshot.teams,
+    players,
+    playersById: new Map(players.map((player) => [player.id, player])),
+    bullets: snapshot.bullets.map((bullet) => {
+      const old = previousBullets.get(bullet.id);
+      return {
+        ...bullet,
+        x: old ? old.x : bullet.x,
+        y: old ? old.y : bullet.y,
+        targetX: bullet.x,
+        targetY: bullet.y,
+      };
+    }),
+    bombs: snapshot.bombs.map((bomb) => {
+      const old = previousBombs.get(bomb.id);
+      return {
+        ...bomb,
+        x: old ? old.x : bomb.x,
+        y: old ? old.y : bomb.y,
+        targetX: bomb.x,
+        targetY: bomb.y,
+      };
+    }),
+    winnerTeamId: snapshot.winnerTeamId,
+    timeMs: snapshot.timeMs,
+  };
+
+  me = game.playersById.get(myPlayerId) ?? null;
+
+  if (!me) {
+    return;
+  }
+
+  if (!cameraReady) {
+    camera = { x: me.x, y: me.y };
+    cameraReady = true;
+  }
+
+  if (snapshot.events?.length) {
+    handleEvents(snapshot.events);
+  }
+
+  updateNetworkGhostConsole(snapshot);
+}
+
+/* ---------- Ghost shift bridge ---------- */
+
+function setupGhostConsole() {
+  ghostConsole = new GhostConsole({
+    root: ui.ghostConsole,
+    onContribute: contributeFromGhost,
+    onFactoryAction: factoryAction,
+    onPointer: (pointer) => {
+      if (NETWORK && networkJoined) {
+        net.send({ type: 'pointer', ...pointer });
+      }
+    },
+    onTask: (task) => {
+      ghostTaskKey = task;
+      if (NETWORK && networkJoined) {
+        net.send({ type: 'input', ghostTask: task });
+      }
+    },
+    onClose: () => {
+      ghostConsoleVisible = false;
+      updateGhostOpenButton();
+    },
+  });
+
+  ui.ghostOpen.addEventListener('click', () => {
+    if (!me || me.alive) {
+      return;
+    }
+    ghostConsoleVisible = true;
+    if (NETWORK) {
+      ghostConsole.show();
+    } else {
+      updateLocalGhostConsole({ force: true });
+    }
+    updateGhostOpenButton();
+  });
+}
+
+function updateGhostOpenButton() {
+  if (!ui.ghostOpen) {
+    return;
+  }
+  ui.ghostOpen.hidden = !(me && !me.alive && ghostConsole && !ghostConsole.visible);
+}
+
+function contributeFromGhost({ game: source, resources = {} }) {
+  if (NETWORK) {
+    net?.send({ type: 'contribute', game: source, resources });
+    return;
+  }
+
+  if (!me || me.alive || game.teams[me.teamId].eliminated) {
+    return;
+  }
+
+  const hp = Number(resources.hp ?? 0);
+  const ammo = Number(resources.ammo ?? 0);
+  const dashSeconds = Number(resources.dashSeconds ?? 0);
+
+  if (![hp, ammo, dashSeconds].every(Number.isFinite)) {
+    return;
+  }
+  if (hp < 0) {
+    const result = game.drainHp(me.teamId, -hp);
+    handleEvents(result.events);
+  } else {
+    game.contribute(me.teamId, {
+      hp: Math.max(0, hp),
+      ammo: Math.max(0, ammo),
+      dashSeconds: Math.max(0, dashSeconds),
+    });
+  }
+}
+
+function factoryAction(action) {
+  if (NETWORK) {
+    net?.send({ type: 'factory', ...action });
+    return;
+  }
+
+  if (!localFactory) {
+    return;
+  }
+
+  if (action.action === 'take') {
+    localFactory.takePot();
+  } else if (action.action === 'drop') {
+    const result = localFactory.dropPot(Number(action.potId), action.targetId);
+    if (result.type === 'rejected') {
+      toast(`FACTORY — ${String(result.reason).replaceAll('-', ' ').toUpperCase()}`);
+    }
+  }
+
+  updateLocalGhostConsole({ force: true });
+}
+
+function localFactorySnapshot() {
+  if (!localFactory) {
+    return null;
+  }
+
+  return {
+    elapsedMs: localFactory.elapsedMs,
+    pots: localFactory.pots.filter((pot) => pot.location !== 'exited'),
+    stationCapacity: localFactory.stationCapacity,
+    bottlerCapacity: localFactory.bottlerCapacity,
+    vialsProduced: localFactory.vialsProduced,
+    secondsProduced: localFactory.secondsProduced,
+    potsBottled: localFactory.potsBottled,
+    potsSpoiled: localFactory.potsSpoiled,
+    owners: {},
+    cursors: [],
+  };
+}
+
+let ghostUiNext = 0;
+
+function updateLocalGhostConsole({ force = false } = {}) {
+  if (!game || !me || !ghostConsole) {
+    return;
+  }
+
+  const now = performance.now();
+  if (!force && now < ghostUiNext) {
+    return;
+  }
+  ghostUiNext = now + 120;
+
+  const team = game.teams[me.teamId];
+  const eliminated = team.eliminated;
+
+  if (me.alive || eliminated) {
+    ghostConsole.hide();
+    ghostConsoleVisible = true;
+    updateGhostOpenButton();
+    return;
+  }
+
+  ghostConsole.setIdentity({ clientId: null, teamId: me.teamId, playerId: me.id });
+  ghostConsole.setState({
+    visible: ghostConsoleVisible,
+    task: ghostTaskKey ?? me.ghostTask ?? 'clicker',
+    hp: team.hp,
+    maxHp: team.maxHp,
+    baseline: team.maxHp,
+    livingTeammates: countAlive(me.teamId),
+    ammo: team.ammo,
+    factory: localFactorySnapshot(),
+    eliminated,
+  });
+  updateGhostOpenButton();
+}
+
+function updateNetworkGhostConsole(snapshot) {
+  if (!ghostConsole || !networkJoined || !me) {
+    return;
+  }
+
+  const team = game.teams[me.teamId];
+  const eliminated = team.eliminated;
+
+  if (me.alive || eliminated) {
+    ghostConsole.hide();
+    ghostConsoleVisible = true;
+    updateGhostOpenButton();
+    return;
+  }
+
+  ghostConsole.setIdentity({
+    clientId: myClientId,
+    teamId: me.teamId,
+    playerId: me.id,
+  });
+  ghostConsole.setState({
+    visible: ghostConsoleVisible,
+    task: ghostTaskKey ?? me.ghostTask ?? 'clicker',
+    hp: team.hp,
+    maxHp: team.maxHp,
+    baseline: team.maxHp,
+    livingTeammates: countAlive(me.teamId),
+    ammo: team.ammo,
+    factory: snapshot.factories?.[me.teamId] ?? null,
+    eliminated,
+  });
+  updateGhostOpenButton();
 }
 
 function handleEvents(events) {
@@ -370,6 +900,10 @@ function render(now) {
   ctx.clearRect(0, 0, viewWidth, viewHeight);
   ctx.fillStyle = '#070605';
   ctx.fillRect(0, 0, viewWidth, viewHeight);
+
+  if (!game || !me) {
+    return;
+  }
 
   drawTiles();
   drawSpawnZones();
@@ -683,6 +1217,10 @@ function drawCrosshair() {
 function updateHud(now, delta) {
   updateEffects(delta);
 
+  if (!game || !me) {
+    return;
+  }
+
   if (now >= hudNext) {
     hudNext = now + 120;
     updateStats();
@@ -711,8 +1249,10 @@ function updateStats() {
   ui.stats.frame.textContent = `${frameMs.toFixed(1)} ms`;
   ui.stats.frame.className = `stat ${frameMs <= 20 ? '' : frameMs <= 33 ? 'is-ok' : 'is-bad'}`;
 
-  ui.stats.conn.textContent = 'LOCAL';
-  ui.stats.conn.className = 'stat is-dim';
+  ui.stats.conn.textContent = NETWORK ? networkStatus : 'LOCAL';
+  ui.stats.conn.className = `stat ${
+    NETWORK && networkStatus === 'ONLINE' ? '' : 'is-dim'
+  }`;
 
   const aliveA = game.teams[0].eliminated ? 0 : countAlive(0);
   const aliveB = game.teams[1].eliminated ? 0 : countAlive(1);
@@ -774,7 +1314,10 @@ function updateHealth() {
     );
   } else if (team.eliminated) {
     ui.statusLabel.textContent = 'ELIMINATED';
-    showBanner('ELIMINATED', 'Press R for a new match');
+    showBanner(
+      'ELIMINATED',
+      NETWORK ? 'The collective falls — wait for the next match' : 'Press R for a new match',
+    );
   } else if (!me.alive) {
     ui.statusLabel.textContent = `GHOST · ${TASK_NAMES[me.ghostTask] ?? 'CLICKER'}`;
     ui.banner.hidden = true;
@@ -1126,6 +1669,8 @@ window.addEventListener('keydown', (event) => {
 
   if (
     minimapModeIndex === 2 &&
+    game &&
+    me &&
     (event.code === 'ArrowUp' || event.code === 'ArrowDown')
   ) {
     selectComrat(event.code === 'ArrowDown' ? 1 : -1);
@@ -1138,7 +1683,7 @@ window.addEventListener('keydown', (event) => {
     specialRequested = true;
   } else if (event.code === 'KeyX') {
     minimapModeIndex = (minimapModeIndex + 1) % MINIMAP_MODES.length;
-    if (minimapModeIndex === 2) {
+    if (minimapModeIndex === 2 && game && me) {
       if (!game.playersById.has(routeTargetId)) {
         routeTargetId = me.id;
       }
@@ -1146,13 +1691,27 @@ window.addEventListener('keydown', (event) => {
       toast('COMRATS — ↑ ↓ SELECT ROUTE', 'good');
     }
   } else if (event.code === 'KeyR') {
-    startMatch(Math.floor(Math.random() * 1_000_000_000));
-  } else if (event.code === 'Digit1') {
-    ghostTaskKey = 'clicker';
-  } else if (event.code === 'Digit2') {
-    ghostTaskKey = 'ammo';
-  } else if (event.code === 'Digit3') {
-    ghostTaskKey = 'dash';
+    if (NETWORK) {
+      if (networkJoined) {
+        net.send({ type: 'rematch' });
+        toast('REMATCH REQUESTED', 'good');
+      }
+    } else if (game) {
+      startLocalMatch(Math.floor(Math.random() * 1_000_000_000));
+    }
+  } else if (event.code === 'Digit1' || event.code === 'Digit2' || event.code === 'Digit3') {
+    const task = event.code === 'Digit1' ? 'clicker' : event.code === 'Digit2' ? 'ammo' : 'dash';
+    ghostTaskKey = task;
+
+    if (me && !me.alive && !game.teams[me.teamId].eliminated) {
+      ghostConsoleVisible = true;
+      if (NETWORK) {
+        net.send({ type: 'input', ghostTask: task });
+      } else {
+        ghostConsole.select(task);
+        updateLocalGhostConsole({ force: true });
+      }
+    }
   }
 });
 
@@ -1192,5 +1751,14 @@ window.addEventListener('contextmenu', (event) => {
 /* ---------- Boot ---------- */
 
 resize();
-startMatch(20261110);
+setupGhostConsole();
+
+if (NETWORK) {
+  setupLobby();
+  connectNetwork();
+} else {
+  ui.lobby.hidden = true;
+  startLocalMatch(20261110);
+}
+
 requestAnimationFrame(frame);
