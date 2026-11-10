@@ -225,7 +225,7 @@ export class GhostConsole {
 
     if (data.type === 'pointer') {
       const now = performance.now();
-      if (now < this.pointerNext) {
+      if (data.active !== false && now < this.pointerNext) {
         return;
       }
       this.pointerNext = now + 60;
