@@ -395,7 +395,7 @@ function drawTiles() {
   const minY = Math.max(0, Math.floor(camera.y - halfHeight));
   const maxY = Math.min(game.maze.height - 1, Math.ceil(camera.y + halfHeight));
 
-  const wallShades = ['#3b3328', '#352e24', '#41382b'];
+  const wallShades = ['#3b2a22', '#35241d', '#433026'];
 
   for (let y = minY; y <= maxY; y += 1) {
     for (let x = minX; x <= maxX; x += 1) {
@@ -411,7 +411,7 @@ function drawTiles() {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
         ctx.fillRect(screenX, screenY, TILE_PX + 0.5, 2);
       } else {
-        ctx.fillStyle = (x + y) % 2 === 0 ? '#0d0b09' : '#0b0a08';
+        ctx.fillStyle = (x + y) % 2 === 0 ? '#0d0a08' : '#0b0806';
         ctx.fillRect(screenX, screenY, TILE_PX + 0.5, TILE_PX + 0.5);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.018)';
         ctx.fillRect(screenX + TILE_PX - 1, screenY, 1, TILE_PX);

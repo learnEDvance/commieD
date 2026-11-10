@@ -1,0 +1,77 @@
+/*
+ * commieD shared palette.
+ *
+ * Every page loads this file before its own stylesheet. Game stylesheets alias
+ * their local colour tokens to these values so the maze, the factories, and the
+ * ghost-shift minigames read as one revolutionary broadcast.
+ */
+:root {
+  color-scheme: dark;
+
+  --commie-black: #070504;
+  --commie-ink: #0d0907;
+  --commie-panel: #17120d;
+  --commie-panel-soft: #221a12;
+  --commie-edge: #4a3524;
+  --commie-edge-soft: #2c2116;
+
+  --commie-red: #c22a2f;
+  --commie-red-deep: #7d1418;
+  --commie-red-bright: #ef5350;
+  --commie-gold: #f2c94c;
+  --commie-gold-soft: #f8e7ab;
+  --commie-cream: #f1e8d4;
+  --commie-muted: #a89a80;
+  --commie-dim: #6f6555;
+  --commie-green: #7fc96a;
+  --commie-teal: #5bc0be;
+
+  --commie-font: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  --commie-display: "Impact", "Arial Narrow", "Trebuchet MS", sans-serif;
+}
+
+::selection {
+  background: var(--commie-red);
+  color: var(--commie-cream);
+}
+
+:focus-visible {
+  outline-color: var(--commie-gold);
+}
+
+* {
+  scrollbar-color: var(--commie-edge) transparent;
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--commie-edge);
+}
+
+/* A shared strip used by hosts that want to label an embedded comrade. */
+.commie-ribbon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--commie-edge);
+  border-radius: 3px;
+  background:
+    linear-gradient(90deg, var(--commie-red-deep), transparent 70%),
+    var(--commie-panel);
+  color: var(--commie-gold);
+  font-family: var(--commie-font);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.commie-ribbon::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--commie-red);
+  box-shadow: 0 0 8px var(--commie-red);
+}

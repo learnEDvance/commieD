@@ -1,11 +1,16 @@
 :root {
   color-scheme: dark;
-  font-family: system-ui, sans-serif;
+  font-family: var(--commie-font);
   --slot-width: clamp(23.1px, 4.62vw, 48.3px);
   --slot-gap: clamp(2.1px, 0.735vw, 8.4px);
   --slots: 10;
   --manifold-inset: 48px;
   --feed-lift: 20px;
+  --ink: var(--commie-cream);
+  --gold: var(--commie-gold);
+  --red: var(--commie-red);
+  --green: var(--commie-green);
+  --edge: var(--commie-edge);
 }
 
 * {
@@ -20,8 +25,10 @@ body {
 body {
   margin: 0;
   overflow: hidden;
-  background: #0b0d0b;
-  color: #f2f2f2;
+  background:
+    radial-gradient(circle at 50% 0%, #2a1011 0%, transparent 60%),
+    var(--commie-ink);
+  color: var(--commie-cream);
 }
 
 .factory {
@@ -48,11 +55,11 @@ body {
   transform: translateX(-50%);
   font-size: 12px;
   letter-spacing: 0.08em;
-  color: #9aa39a;
+  color: var(--commie-muted);
 }
 
 .stat strong {
-  color: #f2c94c;
+  color: var(--commie-gold);
   font-variant-numeric: tabular-nums;
 }
 
@@ -89,31 +96,31 @@ body {
   display: grid;
   place-items: center;
   height: 48.3px;
-  border: 1px solid #2a2f2a;
+  border: 1px solid var(--commie-edge-soft);
   font-family: ui-monospace, monospace;
   font-size: 23.1px;
 }
 
 .code-char.is-correct {
   border-color: #2f4a3a;
-  color: #6fcf97;
+  color: var(--commie-green);
 }
 
 .code-char.is-wrong {
   border-color: #5a2c2c;
-  color: #eb5757;
+  color: var(--commie-red-bright);
 }
 
 .code-char.is-current {
-  border-color: #f2c94c;
-  color: #f2c94c;
+  border-color: var(--commie-gold);
+  color: var(--commie-gold);
 }
 
 .code-status {
   margin: 0;
   min-height: 16.8px;
   font-size: 12.6px;
-  color: #9aa39a;
+  color: var(--commie-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -152,8 +159,8 @@ body {
   justify-items: center;
   gap: 7.35px;
   padding: 10.5px 12.6px;
-  border: 1px solid #2a2f2a;
-  background: #0b0d0b;
+  border: 1px solid var(--commie-edge-soft);
+  background: var(--commie-ink);
   transform: translate(-50%, -50%);
   transition:
     transform 260ms cubic-bezier(0.22, 0.8, 0.25, 1),
@@ -179,7 +186,7 @@ body {
 }
 
 .magazine.is-broken {
-  border-color: #eb5757;
+  border-color: var(--commie-red-bright);
 }
 
 .magazine__slots {
@@ -191,28 +198,28 @@ body {
 .magazine__slot {
   width: var(--slot-width);
   height: 23.1px;
-  border: 1px solid #2a2f2a;
+  border: 1px solid var(--commie-edge-soft);
   background: #111411;
 }
 
 .magazine__slot.is-current {
-  border-color: #f2c94c;
+  border-color: var(--commie-gold);
 }
 
 .magazine__slot.is-correct {
-  border-color: #6fcf97;
-  background: #6fcf97;
+  border-color: var(--commie-green);
+  background: var(--commie-green);
 }
 
 .magazine__slot.is-wrong {
-  border-color: #eb5757;
+  border-color: var(--commie-red-bright);
   background: #7a2c2c;
 }
 
 .magazine__label {
   font-size: 10.5px;
   letter-spacing: 0.14em;
-  color: #9aa39a;
+  color: var(--commie-muted);
 }
 
 .magazine.is-waiting .magazine__label {
@@ -220,7 +227,7 @@ body {
 }
 
 .magazine.is-broken .magazine__label {
-  color: #eb5757;
+  color: var(--commie-red-bright);
 }
 
 /* ---------- Bullet feeds ---------- */
@@ -315,14 +322,14 @@ body {
   z-index: 0;
   width: 1px;
   margin-left: -0.5px;
-  background: #2a2f2a;
+  background: var(--commie-edge-soft);
 }
 
 .feed__fill {
   z-index: 1;
   width: 2px;
   margin-left: -1px;
-  background: #6fcf97;
+  background: var(--commie-green);
   transform: scaleY(0);
   transform-origin: bottom;
   transition: transform 260ms ease-in;
@@ -333,7 +340,7 @@ body {
 }
 
 .feed.is-wrong .feed__fill {
-  background: #eb5757;
+  background: var(--commie-red-bright);
 }
 
 .feed__arrow {
@@ -350,11 +357,11 @@ body {
 }
 
 .feed.is-used .feed__arrow {
-  border-bottom-color: #6fcf97;
+  border-bottom-color: var(--commie-green);
 }
 
 .feed.is-wrong .feed__arrow {
-  border-bottom-color: #eb5757;
+  border-bottom-color: var(--commie-red-bright);
 }
 
 .feed__junction {
@@ -367,15 +374,15 @@ body {
   margin-left: -3px;
   border: 1px solid #3a403a;
   border-radius: 50%;
-  background: #0b0d0b;
+  background: var(--commie-ink);
 }
 
 .feed.is-used .feed__junction {
-  border-color: #6fcf97;
+  border-color: var(--commie-green);
 }
 
 .feed.is-wrong .feed__junction {
-  border-color: #eb5757;
+  border-color: var(--commie-red-bright);
 }
 
 .feed__queue {
@@ -432,13 +439,13 @@ body {
 
 .fly-bullet {
   position: fixed;
-  border: 1px solid #6fcf97;
-  background: #6fcf97;
+  border: 1px solid var(--commie-green);
+  background: var(--commie-green);
   will-change: transform, opacity;
 }
 
 .fly-bullet.is-wrong {
-  border-color: #eb5757;
+  border-color: var(--commie-red-bright);
   background: #7a2c2c;
 }
 

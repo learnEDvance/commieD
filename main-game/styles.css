@@ -1,17 +1,17 @@
 :root {
   color-scheme: dark;
-  font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
-  --ink: #f1e8d4;
-  --muted: #a39b83;
-  --dim: #706b5b;
-  --gold: #f2c94c;
-  --gold-soft: #f8e7ab;
-  --red: #e23b3b;
+  font-family: var(--commie-font);
+  --ink: var(--commie-cream);
+  --muted: var(--commie-muted);
+  --dim: var(--commie-dim);
+  --gold: var(--commie-gold);
+  --gold-soft: var(--commie-gold-soft);
+  --red: var(--commie-red-bright);
   --red-soft: #ff8a80;
-  --green: #7fc96a;
-  --teal: #5bc0be;
-  --panel: rgba(12, 10, 7, 0.82);
-  --edge: #3b342a;
+  --green: var(--commie-green);
+  --teal: var(--commie-teal);
+  --panel: rgba(13, 9, 7, 0.84);
+  --edge: var(--commie-edge);
 }
 
 * {
@@ -26,7 +26,9 @@ body {
 body {
   margin: 0;
   overflow: hidden;
-  background: #070605;
+  background:
+    radial-gradient(circle at 50% 0%, #2a1011 0%, transparent 60%),
+    #070605;
   color: var(--ink);
   -webkit-user-select: none;
   user-select: none;

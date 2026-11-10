@@ -1,18 +1,18 @@
 :root {
   color-scheme: dark;
-  font-family: "Trebuchet MS", system-ui, sans-serif;
-  --ink: #f1e8d4;
-  --muted: #a39b83;
-  --dim: #706b5b;
-  --gold: #f2c94c;
-  --gold-soft: #f8e7ab;
-  --red: #d64545;
-  --red-soft: #ff9b91;
-  --green: #96d05c;
-  --teal: #7fc9ba;
-  --edge: #484134;
-  --edge-dark: #29251d;
-  --panel: #17150f;
+  font-family: var(--commie-font);
+  --ink: var(--commie-cream);
+  --muted: var(--commie-muted);
+  --dim: var(--commie-dim);
+  --gold: var(--commie-gold);
+  --gold-soft: var(--commie-gold-soft);
+  --red: var(--commie-red);
+  --red-soft: var(--commie-red-bright);
+  --green: var(--commie-green);
+  --teal: var(--commie-teal);
+  --edge: var(--commie-edge);
+  --edge-dark: var(--commie-edge-soft);
+  --panel: var(--commie-panel);
 }
 
 * {
@@ -29,9 +29,9 @@ body {
   overflow: hidden;
   color: var(--ink);
   background:
-    radial-gradient(circle at 30% 0%, #2a2117 0%, transparent 45%),
-    radial-gradient(circle at 80% 100%, #231d15 0%, transparent 55%),
-    linear-gradient(180deg, #0f0d09, #070605);
+    radial-gradient(circle at 30% 0%, #3a1214 0%, transparent 45%),
+    radial-gradient(circle at 80% 100%, #24130f 0%, transparent 55%),
+    linear-gradient(180deg, #100a08, var(--commie-black));
   -webkit-user-select: none;
   user-select: none;
 }
