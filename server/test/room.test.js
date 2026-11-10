@@ -56,6 +56,17 @@ test('joining sends a welcome with a JSON-safe maze', () => {
   assert.ok(maze.spawns.length >= 2);
 });
 
+test('joining preserves an available selected teammate colour', () => {
+  const room = makeRoom();
+  const { client } = addClient(room, 'Ana');
+  const selected = '#b07cf0';
+  const result = room.join(client.id, { name: 'Ana', teamId: 0, color: selected });
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.player.color, selected);
+  assert.equal(room.getSnapshot().players.find((player) => player.id === result.player.id).color, selected);
+});
+
 test('humans replace bots when a preferred team is full', () => {
   const room = makeRoom({ botsPerTeam: 2 });
   const players = [];

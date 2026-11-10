@@ -119,7 +119,7 @@ export class Room {
     return true;
   }
 
-  join(clientId, { name, teamId } = {}) {
+  join(clientId, { name, teamId, color } = {}) {
     const client = this.clients.get(clientId);
     if (!client) {
       return { accepted: false, reason: 'unknown-client' };
@@ -141,7 +141,7 @@ export class Room {
     client.name = sanitizeName(name ?? client.name, client.name);
     client.preferredTeamId = targetTeam;
     this.#makeRoomForHuman(targetTeam);
-    const player = this.game.join({ teamId: targetTeam, name: client.name });
+    const player = this.game.join({ teamId: targetTeam, name: client.name, color });
     client.playerId = player.id;
 
     client.send({

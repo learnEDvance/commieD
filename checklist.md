@@ -107,6 +107,8 @@ Tick only verified work. One small step at a time.
 - [x] Asset manifest covering images, video, audio, and fonts (`assets-needed.md`)
 - [x] Authoritative dependency-free Node server, raw WebSocket room, bots, and snapshots
 - [x] Lobby with comrade name and collective choice; humans replace bots
+- [x] Server joins preserve an available distinct teammate colour (unit tested)
+- [ ] Browser smoke test: teammate colour picker, reserve change indicators, and effect timer notch
 - [x] Ghost console embeds one minigame at a time and relays contributions
 - [x] One shared Dash Supplement Factory per team with claims, cursors, and bottling rewards
 - [x] Server tests: WebSocket codec, room joins, ghost-only contributions, factories, reset

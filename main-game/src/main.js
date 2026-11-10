@@ -1,5 +1,12 @@
 import { BotDirector } from './bots.js';
-import { EMPTY_INPUT, Game, PLAYER_RADIUS, TEAM_HP_PER_PLAYER } from './game.js';
+import {
+  EMPTY_INPUT,
+  ENEMY_COLOR,
+  Game,
+  PLAYER_COLORS,
+  PLAYER_RADIUS,
+  TEAM_HP_PER_PLAYER,
+} from './game.js';
 import { GhostConsole } from './ghost-console.js';
 import { NetClient, defaultWebSocketUrl } from './net.js';
 import { TILE, isWall, spawnTeamAt } from './maze.js';
@@ -13,8 +20,9 @@ const LOCAL_TEAM = 0;
 const PLAYERS_PER_TEAM = 4;
 const LOCAL_AMMO = 900;
 const ITEMS_PER_TEAM = 8;
-const MINIMAP_MODES = ['NEARBY', 'FULL', 'COMRATS'];
+const MINIMAP_MODES = ['FULL', 'COMRATS'];
 const INPUT_INTERVAL_MS = 50;
+const DELTA_VISIBLE_MS = 1400;
 
 const ITEM_META = Object.freeze({
   bomb: { label: 'B', name: 'BOMB', color: '#e23b3b' },
@@ -69,10 +77,14 @@ const ui = {
   lobby: document.getElementById('lobby'),
   lobbyName: document.getElementById('lobby-name'),
   lobbyTeams: document.getElementById('lobby-teams'),
+  lobbyColors: document.getElementById('lobby-colors'),
   lobbyJoin: document.getElementById('lobby-join'),
   lobbyStatus: document.getElementById('lobby-status'),
   ghostOpen: document.getElementById('ghost-open'),
   ghostConsole: document.getElementById('ghost-console'),
+  ammoDelta: document.getElementById('ammo-delta'),
+  dashDelta: document.getElementById('dash-delta'),
+  effectNotch: document.getElementById('effect-notch'),
 };
 
 const keys = new Set();
@@ -89,6 +101,7 @@ let networkTeams = [];
 let networkStatus = NETWORK ? 'CONNECTING' : 'LOCAL';
 let networkJoined = false;
 let lobbyTeamId = 0;
+let lobbyColor = PLAYER_COLORS[0];
 let cameraReady = false;
 let inputNext = 0;
 let ghostConsole;
@@ -110,6 +123,8 @@ let fps = 0;
 let frameMs = 0;
 let hudNext = 0;
 let comratsNext = 0;
+let reserveBaseline = { teamId: null, ammo: 0, dashSeconds: 0 };
+let reserveDelta = { ammo: 0, dashSeconds: 0, until: 0 };
 
 function resize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -132,7 +147,7 @@ function startLocalMatch(seed) {
     itemsPerTeam: ITEMS_PER_TEAM,
   });
 
-  me = game.join({ teamId: LOCAL_TEAM, name: 'YOU' });
+  me = game.join({ teamId: LOCAL_TEAM, name: 'YOU', color: PLAYER_COLORS[0] });
   for (let index = 1; index < PLAYERS_PER_TEAM; index += 1) {
     game.join({ teamId: LOCAL_TEAM, isBot: true });
   }
@@ -156,8 +171,10 @@ function startLocalMatch(seed) {
   specialRequested = false;
   ghostTaskKey = null;
   ghostConsoleVisible = true;
-  routeTargetId = me.id;
+  routeTargetId = null;
   routePath = [];
+  reserveBaseline = { teamId: null, ammo: 0, dashSeconds: 0 };
+  reserveDelta = { ammo: 0, dashSeconds: 0, until: 0 };
   ui.banner.hidden = true;
   ui.banner.className = 'banner';
   ui.lobby.hidden = true;
@@ -408,6 +425,11 @@ function setupLobby() {
     return;
   }
 
+  const storedColor = window.localStorage.getItem('commied-color');
+  if (PLAYER_COLORS.includes(storedColor)) {
+    lobbyColor = storedColor;
+  }
+
   ui.lobbyName.value = window.localStorage.getItem('commied-name') ?? '';
   ui.lobbyJoin.addEventListener('click', joinNetwork);
   ui.lobbyName.addEventListener('keydown', (event) => {
@@ -416,6 +438,30 @@ function setupLobby() {
       joinNetwork();
     }
   });
+  renderLobbyColors();
+}
+
+function renderLobbyColors() {
+  if (!ui.lobbyColors) {
+    return;
+  }
+
+  const swatches = PLAYER_COLORS.map((color) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'lobby__color';
+    button.dataset.color = color;
+    button.style.backgroundColor = color;
+    button.setAttribute('aria-label', `Colour ${color}`);
+    button.classList.toggle('is-selected', color === lobbyColor);
+    button.addEventListener('click', () => {
+      lobbyColor = color;
+      renderLobbyColors();
+    });
+    return button;
+  });
+
+  ui.lobbyColors.replaceChildren(...swatches);
 }
 
 function joinNetwork() {
@@ -429,10 +475,11 @@ function joinNetwork() {
   }
 
   window.localStorage.setItem('commied-name', name);
+  window.localStorage.setItem('commied-color', lobbyColor);
   ui.lobbyJoin.disabled = true;
   ui.lobbyStatus.classList.remove('is-error');
   ui.lobbyStatus.textContent = 'JOINING THE COLLECTIVE…';
-  net.join({ name, teamId: lobbyTeamId });
+  net.join({ name, teamId: lobbyTeamId, color: lobbyColor });
 }
 
 function renderLobbyTeams() {
@@ -486,6 +533,8 @@ function handleNetMessage(message) {
       ghostTaskKey = null;
       ghostConsoleVisible = true;
       effects = [];
+      reserveBaseline = { teamId: null, ammo: 0, dashSeconds: 0 };
+      reserveDelta = { ammo: 0, dashSeconds: 0, until: 0 };
       ui.lobby.hidden = true;
       ui.banner.hidden = true;
       ui.banner.className = 'banner';
@@ -1135,7 +1184,7 @@ function drawPlayers(now) {
     // Body
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = team.color;
+    ctx.fillStyle = player.teamId === me.teamId ? player.color : ENEMY_COLOR;
     ctx.fill();
     ctx.lineWidth = isMe ? 2.5 : 1.5;
     ctx.strokeStyle = isMe ? '#ffffff' : '#100d09';
@@ -1266,9 +1315,24 @@ function countAlive(teamId) {
 
 function updateReserves() {
   const team = game.teams[me.teamId];
+  const now = performance.now();
+  if (reserveBaseline.teamId !== team.id) {
+    reserveBaseline = { teamId: team.id, ammo: team.ammo, dashSeconds: team.dashSeconds };
+    reserveDelta = { ammo: 0, dashSeconds: 0, until: 0 };
+  } else {
+    const ammoChange = team.ammo - reserveBaseline.ammo;
+    const dashChange = team.dashSeconds - reserveBaseline.dashSeconds;
+    if (ammoChange !== 0 || dashChange !== 0) {
+      reserveDelta = { ammo: ammoChange, dashSeconds: dashChange, until: now + DELTA_VISIBLE_MS };
+      reserveBaseline = { teamId: team.id, ammo: team.ammo, dashSeconds: team.dashSeconds };
+    }
+  }
+
   ui.teamName.textContent = team.name.toUpperCase();
   ui.ammo.textContent = String(team.ammo);
   ui.dash.textContent = `${Math.floor(team.dashSeconds)}s`;
+  showReserveDelta(ui.ammoDelta, reserveDelta.ammo, now < reserveDelta.until);
+  showReserveDelta(ui.dashDelta, reserveDelta.dashSeconds, now < reserveDelta.until);
   ui.special.textContent = team.specials.length
     ? ITEM_META[team.specials[team.specials.length - 1]].name
     : '—';
@@ -1285,6 +1349,14 @@ function updateReserves() {
   ui.specialQueue.replaceChildren(...queue);
 }
 
+function showReserveDelta(element, amount, visible) {
+  if (!element) return;
+  element.textContent = visible && amount !== 0
+    ? `${amount > 0 ? '+' : '−'}${Math.abs(Math.round(amount * 10) / 10)}`
+    : '';
+  element.className = amount > 0 ? 'is-positive' : 'is-negative';
+}
+
 function updateHealth() {
   const team = game.teams[me.teamId];
   const maxHp = Math.max(1, team.maxHp);
@@ -1299,9 +1371,14 @@ function updateHealth() {
 
   if (team.activeEffect) {
     const seconds = Math.max(0, team.activeEffect.msLeft / 1000);
-    ui.effectLabel.textContent = `${EFFECT_NAMES[team.activeEffect.type] ?? team.activeEffect.type} ${seconds.toFixed(0)}s`;
+    const effectName = EFFECT_NAMES[team.activeEffect.type] ?? team.activeEffect.type;
+    ui.effectLabel.textContent = effectName;
+    ui.effectNotch.hidden = false;
+    ui.effectNotch.textContent = `${effectName} · ${seconds.toFixed(1)}s`;
   } else {
     ui.effectLabel.textContent = 'NO EFFECT';
+    ui.effectNotch.hidden = true;
+    ui.effectNotch.textContent = '';
   }
 
   if (game.winnerTeamId !== null) {
@@ -1425,11 +1502,10 @@ function updateMinimap() {
 
   for (const player of game.players) {
     const [x, y] = project(player.x, player.y);
-    const team = game.teams[player.teamId];
     minimapCtx.globalAlpha = player.alive ? 1 : 0.45;
     minimapCtx.beginPath();
     minimapCtx.arc(x, y, player.id === me.id ? 2.6 : 2, 0, Math.PI * 2);
-    minimapCtx.fillStyle = team.color;
+    minimapCtx.fillStyle = player.teamId === me.teamId ? player.color : ENEMY_COLOR;
     minimapCtx.fill();
     if (player.id === me.id) {
       minimapCtx.strokeStyle = '#ffffff';

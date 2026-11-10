@@ -179,7 +179,7 @@ test('coat blocks all incoming damage while active', () => {
   assert.ok(result.events.some((event) => event.type === 'damage-blocked'));
 });
 
-test('dashing spends the shared dash reserve', () => {
+test('dashing spends the shared reserve only when the player moves', () => {
   const game = new Game({ seed: 10, teams: 2, playersPerTeam: 2, width: 41, height: 41 });
   const player = game.join({ teamId: 0 });
 
@@ -188,6 +188,10 @@ test('dashing spends the shared dash reserve', () => {
   player.y = room.y + 1.5;
 
   stepWith(game, player, { dash: true }, 16);
+  assert.equal(game.teams[0].dashSeconds, START_DASH_SECONDS);
+  assert.equal(player.dashMs, 0);
+
+  stepWith(game, player, { dash: true, right: true }, 16);
 
   assert.equal(game.teams[0].dashSeconds, START_DASH_SECONDS - 1);
   assert.ok(player.dashMs > 0);

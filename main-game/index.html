@@ -41,11 +41,11 @@
         </header>
         <div class="reserve">
           <span>AMMO</span>
-          <strong id="ammo">0</strong>
+          <span class="reserve__value"><strong id="ammo">0</strong><small id="ammo-delta" aria-live="polite"></small></span>
         </div>
         <div class="reserve">
           <span>DASH</span>
-          <strong id="dash">0s</strong>
+          <span class="reserve__value"><strong id="dash">0s</strong><small id="dash-delta" aria-live="polite"></small></span>
         </div>
         <div class="reserve">
           <span>SPECIAL</span>
@@ -59,8 +59,11 @@
           <span id="health-team">VANGUARD</span>
           <strong id="hp-label">0 / 0</strong>
         </header>
-        <div class="health__bar">
-          <span class="health__fill" id="hp-fill"></span>
+        <div class="health__track">
+          <div class="effect-notch" id="effect-notch" hidden></div>
+          <div class="health__bar">
+            <span class="health__fill" id="hp-fill"></span>
+          </div>
         </div>
         <footer class="health__foot">
           <span id="effect-label">NO EFFECT</span>
@@ -119,6 +122,10 @@
           <span>COMRADE NAME</span>
           <input id="lobby-name" maxlength="16" autocomplete="off" spellcheck="false" />
         </label>
+        <div class="lobby__colour-field">
+          <span>COMRADE COLOUR</span>
+          <div class="lobby__colors" id="lobby-colors" role="group" aria-label="Choose your player colour"></div>
+        </div>
         <div class="lobby__teams" id="lobby-teams" role="group" aria-label="Choose a collective"></div>
         <button id="lobby-join" class="lobby__join" type="button">JOIN THE MAZE</button>
         <p class="lobby__status" id="lobby-status">Connecting to the collective…</p>

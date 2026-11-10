@@ -177,6 +177,7 @@ export function createGameServer({ seed, room: providedRoom, tickMs = 33, snapsh
             const result = room.join(client.id, {
               name: message.name,
               teamId: message.teamId,
+              color: message.color,
             });
             if (!result.accepted) {
               client.send({ type: 'join-rejected', reason: result.reason });

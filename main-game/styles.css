@@ -217,6 +217,22 @@ body {
   letter-spacing: 0.04em;
 }
 
+.reserve__value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.reserve__value small {
+  min-width: 20px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.reserve__value small.is-positive { color: var(--green); }
+.reserve__value small.is-negative { color: var(--red-soft); }
+
 .reserve:first-of-type strong {
   color: var(--gold-soft);
 }
@@ -275,6 +291,10 @@ body {
   letter-spacing: 0.04em;
 }
 
+.health__track {
+  position: relative;
+}
+
 .health__bar {
   position: relative;
   height: 13px;
@@ -283,6 +303,21 @@ body {
   border-radius: 3px;
   background: #0a0806;
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.65);
+}
+
+.effect-notch {
+  position: absolute;
+  right: 9px;
+  bottom: calc(100% + 3px);
+  padding: 3px 7px;
+  border: 1px solid #4d817d;
+  border-radius: 3px 3px 0 0;
+  background: rgba(13, 9, 7, 0.96);
+  color: var(--teal);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
 }
 
 .health__fill {
@@ -510,6 +545,42 @@ body {
 .lobby__field input:focus {
   border-color: var(--gold);
   outline: none;
+}
+
+.lobby__colour-field {
+  display: grid;
+  gap: 7px;
+  margin: -2px 0 15px;
+  color: var(--gold);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-align: left;
+}
+
+.lobby__colors {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(18px, 1fr));
+  gap: 5px;
+}
+
+.lobby__color {
+  aspect-ratio: 1;
+  min-width: 18px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.lobby__color.is-selected {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.lobby__color:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
 }
 
 .lobby__teams {

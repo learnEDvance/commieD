@@ -344,7 +344,7 @@ function carveRectangle(tiles, width, left, top, right, bottom) {
   }
 }
 
-function rollItemType(rng) {
+export function rollItemType(rng) {
   const total = ITEM_TYPES.reduce((sum, type) => sum + ITEM_WEIGHTS[type], 0);
   let roll = rng.next() * total;
 

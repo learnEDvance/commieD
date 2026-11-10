@@ -2,12 +2,15 @@ import {
   generateMaze,
   isWall,
   makeRng,
+  rollItemType,
   spawnTeamAt,
 } from './maze.js';
 
 export const TEAM_HP_PER_PLAYER = 100;
 export const PLAYER_RADIUS = 0.42;
 export const MOVE_SPEED = 4.2;
+export const MOVE_ACCELERATION = 26;
+export const MOVE_FRICTION = 20;
 export const DASH_SPEED = 10.5;
 export const DASH_DURATION_MS = 180;
 export const DASH_COST_SECONDS = 1;
@@ -25,6 +28,28 @@ export const BOMB_DAMAGE = 100;
 export const DEFAULT_GUN_DAMAGE = 1;
 export const GUN_PLUS_DAMAGE = 2;
 export const COAT_SPEED_FACTOR = 0.4;
+export const ITEM_RESPAWN_MIN_MS = 15_000;
+export const ITEM_RESPAWN_MAX_MS = 60_000;
+export const ENEMY_COLOR = '#e23b3b';
+export const TEAM_REGEN = Object.freeze({
+  ammoPerSecond: 10,
+  hpPerSecond: 2,
+  dashSecondsPerSecond: 1,
+});
+
+/** Ten distinct teammate colours. None of them are the enemy red. */
+export const PLAYER_COLORS = Object.freeze([
+  '#f2c94c',
+  '#5bc0be',
+  '#b07cf0',
+  '#e08a3c',
+  '#7fc96a',
+  '#8fb8e0',
+  '#c8d06a',
+  '#6ad0a0',
+  '#d0a0f0',
+  '#f0c8a0',
+]);
 
 export const SPECIAL_DURATIONS = Object.freeze({
   gunPlus: 120000,
@@ -57,12 +82,12 @@ export const EMPTY_INPUT = Object.freeze({
 });
 
 const TEAM_PRESETS = Object.freeze([
-  { name: 'Vanguard', color: '#e23b3b' },
   { name: 'Collective', color: '#f2c94c' },
   { name: 'Proletariat', color: '#5bc0be' },
   { name: 'Politburo', color: '#b07cf0' },
   { name: 'Komsomol', color: '#e08a3c' },
   { name: 'Soviet', color: '#7fc96a' },
+  { name: 'Commune', color: '#8fb8e0' },
 ]);
 
 const COMRADE_NAMES = Object.freeze([
@@ -112,14 +137,17 @@ export class Game {
       activeEffect: null,
       kills: 0,
       eliminated: false,
+      regenMs: 0,
     }));
     this.bullets = [];
     this.bombs = [];
     this.playersById = new Map();
     this.nextPlayerId = 1;
     this.nextProjectileId = 1;
+    this.nextItemId = this.maze.items.length + 1;
     this.timeMs = 0;
     this.winnerTeamId = null;
+    this.itemRespawnMs = this.#nextItemRespawnMs();
 
     if (autoJoin) {
       for (const team of this.teams) {
@@ -130,7 +158,7 @@ export class Game {
     }
   }
 
-  join({ teamId, name, isBot = false } = {}) {
+  join({ teamId, name, isBot = false, color } = {}) {
     const team = teamId === undefined ? this.#teamWithFewestPlayers() : this.#teamById(teamId);
 
     if (!team) {
@@ -148,8 +176,11 @@ export class Game {
       teamId: team.id,
       name: name ?? this.#nextName(),
       isBot,
+      color: this.#pickPlayerColor(team.id, color),
       x: 0,
       y: 0,
+      vx: 0,
+      vy: 0,
       angle: 0,
       alive: true,
       isGhost: false,
@@ -198,6 +229,7 @@ export class Game {
 
     for (const team of this.teams) {
       this.#tickEffect(team, dt, events);
+      this.#tickTeamRegen(team, dt);
     }
 
     for (const player of this.players) {
@@ -219,6 +251,7 @@ export class Game {
     this.#stepBullets(dt, dtSec, events);
     this.#stepBombs(dt, dtSec, events);
     this.#collectItems(events);
+    this.#tickItemRespawn(dt);
 
     return {
       timeMs: this.timeMs,
@@ -358,6 +391,7 @@ export class Game {
         teamId: player.teamId,
         name: player.name,
         isBot: player.isBot,
+        color: player.color,
         x: player.x,
         y: player.y,
         angle: player.angle,
@@ -447,9 +481,18 @@ export class Game {
     };
     const moving = move.x !== 0 || move.y !== 0;
 
-    if (input.dash && player.dashMs <= 0 && team.dashSeconds >= DASH_COST_SECONDS) {
+    if (moving) {
+      const length = Math.hypot(move.x, move.y);
+      move.x /= length;
+      move.y /= length;
+    }
+
+    // Dash is only spent while the player is actually trying to move.
+    if (input.dash && moving && player.dashMs <= 0 && team.dashSeconds >= DASH_COST_SECONDS) {
       player.dashMs = DASH_DURATION_MS;
       team.dashSeconds = Math.max(0, team.dashSeconds - DASH_COST_SECONDS);
+      player.vx = move.x * DASH_SPEED;
+      player.vy = move.y * DASH_SPEED;
       events.push({ type: 'dash', teamId: team.id, playerId: player.id });
     }
 
@@ -458,11 +501,23 @@ export class Game {
       speed *= COAT_SPEED_FACTOR;
     }
 
-    if (moving) {
-      const length = Math.hypot(move.x, move.y);
-      move.x /= length;
-      move.y /= length;
-      this.#movePlayer(player, move.x * speed * dtSec, move.y * speed * dtSec);
+    const targetVx = moving ? move.x * speed : 0;
+    const targetVy = moving ? move.y * speed : 0;
+    const acceleration = (moving ? MOVE_ACCELERATION : MOVE_FRICTION) * dtSec;
+    player.vx = approach(player.vx, targetVx, acceleration);
+    player.vy = approach(player.vy, targetVy, acceleration);
+
+    if (Math.abs(player.vx) > 0.0001 || Math.abs(player.vy) > 0.0001) {
+      const beforeX = player.x;
+      const beforeY = player.y;
+      this.#movePlayer(player, player.vx * dtSec, player.vy * dtSec);
+
+      if (Math.abs(player.x - beforeX) < 1e-9) {
+        player.vx = 0;
+      }
+      if (Math.abs(player.y - beforeY) < 1e-9) {
+        player.vy = 0;
+      }
     }
 
     if (Number.isFinite(input.aimX) && Number.isFinite(input.aimY)) {
@@ -869,6 +924,102 @@ export class Game {
     }
   }
 
+  #pickPlayerColor(teamId, requested) {
+    const teammates = this.players.filter((player) => player.teamId === teamId);
+    const used = new Set(teammates.map((player) => player.color));
+
+    if (PLAYER_COLORS.includes(requested) && !used.has(requested)) {
+      return requested;
+    }
+
+    return PLAYER_COLORS.find((color) => !used.has(color)) ?? PLAYER_COLORS[0];
+  }
+
+  #nextItemRespawnMs() {
+    return (
+      ITEM_RESPAWN_MIN_MS +
+      this.rng.int(ITEM_RESPAWN_MAX_MS - ITEM_RESPAWN_MIN_MS + 1)
+    );
+  }
+
+  #tickItemRespawn(dt) {
+    this.itemRespawnMs -= dt;
+
+    if (this.itemRespawnMs > 0) {
+      return;
+    }
+
+    this.itemRespawnMs = this.#nextItemRespawnMs();
+    this.#spawnRandomItem();
+  }
+
+  #spawnRandomItem() {
+    const occupied = new Set(
+      this.maze.items
+        .filter((item) => !item.taken)
+        .map((item) => `${item.x},${item.y}`),
+    );
+
+    for (const player of this.players) {
+      occupied.add(`${Math.floor(player.x)},${Math.floor(player.y)}`);
+    }
+
+    const candidates = [];
+
+    for (let y = 1; y < this.maze.height - 1; y += 1) {
+      for (let x = 1; x < this.maze.width - 1; x += 1) {
+        if (isWall(this.maze, x, y) || spawnTeamAt(this.maze, x, y) !== -1) {
+          continue;
+        }
+        if (!occupied.has(`${x},${y}`)) {
+          candidates.push({ x, y });
+        }
+      }
+    }
+
+    if (candidates.length === 0) {
+      return null;
+    }
+
+    const spot = candidates[this.rng.int(candidates.length)];
+    const item = {
+      id: this.nextItemId,
+      type: rollItemType(this.rng),
+      x: spot.x,
+      y: spot.y,
+      taken: false,
+    };
+
+    this.nextItemId += 1;
+    this.maze.items.push(item);
+    return item;
+  }
+
+  #tickTeamRegen(team, dt) {
+    if (team.eliminated || team.maxHp <= 0) {
+      team.regenMs = 0;
+      return;
+    }
+
+    const teammates = this.players.filter((player) => player.teamId === team.id);
+
+    if (teammates.length === 0 || teammates.some((player) => !player.alive)) {
+      // Any ghost on the team replaces normal regeneration with the ghost
+      // minigames. A revived team starts the normal timer from zero.
+      team.regenMs = 0;
+      return;
+    }
+
+    team.regenMs += dt;
+
+    while (team.regenMs >= 1000) {
+      team.regenMs -= 1000;
+      team.hp = Math.min(team.maxHp, team.hp + TEAM_REGEN.hpPerSecond);
+      team.ammo += TEAM_REGEN.ammoPerSecond;
+      team.dashSeconds += TEAM_REGEN.dashSecondsPerSecond;
+    }
+  }
+
   #tickEffect(team, dt, events) {
     if (!team.activeEffect) {
       return;
@@ -879,11 +1030,85 @@ export class Game {
     if (team.activeEffect.msLeft <= 0) {
       const type = team.activeEffect.type;
       team.activeEffect = null;
+
+      if (type === 'phaseless') {
+        this.#recoverFromPhaseless(team, events);
+      }
+
       events.push({ type: 'effect-ended', teamId: team.id, effect: type });
     }
+  }
+
+  #recoverFromPhaseless(team, events) {
+    for (const player of this.players) {
+      if (player.teamId !== team.id || !player.alive) {
+        continue;
+      }
+      if (!this.#circleHitsSolid(team.id, player.x, player.y)) {
+        continue;
+      }
+
+      const free = this.#nearestFreeTile(player.x, player.y, team.id);
+
+      if (!free) {
+        continue;
+      }
+
+      player.x = free.x;
+      player.y = free.y;
+      player.vx = 0;
+      player.vy = 0;
+      events.push({
+        type: 'phase-recovered',
+        teamId: team.id,
+        playerId: player.id,
+        x: free.x,
+        y: free.y,
+      });
+    }
+  }
+
+  #nearestFreeTile(x, y, teamId) {
+    const limit = Math.max(this.maze.width, this.maze.height);
+
+    for (let ring = 0; ring <= limit; ring += 1) {
+      for (let dy = -ring; dy <= ring; dy += 1) {
+        for (let dx = -ring; dx <= ring; dx += 1) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) {
+            continue;
+          }
+
+          const tileX = Math.floor(x) + dx;
+          const tileY = Math.floor(y) + dy;
+
+          if (isWall(this.maze, tileX, tileY)) {
+            continue;
+          }
+
+          const centerX = tileX + 0.5;
+          const centerY = tileY + 0.5;
+
+          if (!this.#circleHitsSolid(teamId, centerX, centerY)) {
+            return { x: centerX, y: centerY };
+          }
+        }
+      }
+    }
+
+    return null;
   }
 
   #hasEffect(team, type) {
     return team.activeEffect !== null && team.activeEffect.type === type;
   }
+}
+
+function approach(value, target, maxDelta) {
+  if (value < target) {
+    return Math.min(target, value + maxDelta);
+  }
+  if (value > target) {
+    return Math.max(target, value - maxDelta);
+  }
+  return value;
 }
