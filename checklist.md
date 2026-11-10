@@ -110,7 +110,7 @@ Tick only verified work. One small step at a time.
 - [x] Ghost console embeds one minigame at a time and relays contributions
 - [x] One shared Dash Supplement Factory per team with claims, cursors, and bottling rewards
 - [x] Server tests: WebSocket codec, room joins, ghost-only contributions, factories, reset
-- [ ] Browser smoke test of the unified host, lobby, ghost console, and minigame bridge
+- [x] Browser smoke test: lobby join, authoritative snapshots, ghost console tabs, and host → minigame → server relays for HP, ammo, and factory actions
 - [ ] City sharding
 - [ ] Load-test for large concurrent matches
 - [ ] Replace placeholder visuals with final art
