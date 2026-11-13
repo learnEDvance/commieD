@@ -37,10 +37,10 @@ if (
   throw new Error('Bullet Press UI is incomplete');
 }
 
-const EJECT_DELAY_MS = 420;
+const EJECT_DELAY_MS = 400;
 const SHIFT_MS = 300;
 const MAGAZINE_GAP_PX = 48;
-const FLY_DURATION_MS = 220;
+const FLY_DURATION_MS = 200;
 const BULLET_PITCH_PX = 24.8;
 const BULLET_GAP_PX = 8;
 const FEED_TOP_MARGIN_PX = 32;
@@ -204,7 +204,7 @@ function advanceFeed(feed, incomingBullet, sourceRect) {
       ],
       { duration: FLY_DURATION_MS, easing: 'ease-in' },
     );
-    animation.finished.catch(() => {});
+    animation.finished.catch(() => { });
   }
   return bullet;
 }
